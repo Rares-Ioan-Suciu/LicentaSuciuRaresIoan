@@ -9,7 +9,7 @@ interface LiveMonitorGridProps {
 }
 
 const LiveMonitorGrid: React.FC<LiveMonitorGridProps> = ({ students, accessCode, onAction }) => {
-    const [totalTasks, setTotalTasks] = useState(15); 
+    const [totalTasks, setTotalTasks] = useState(24); 
 
     useEffect(() => {
         const fetchLevelInfo = async () => {
@@ -52,7 +52,7 @@ const LiveMonitorGrid: React.FC<LiveMonitorGridProps> = ({ students, accessCode,
                     key={student.id}
                     data={student}
                     totalTasks={totalTasks} 
-                    onAction={(type) => onAction(student.id, type)}
+                    onAction={(type) => onAction(student.studentName, type)}
                 />
             ))}
         </div>
