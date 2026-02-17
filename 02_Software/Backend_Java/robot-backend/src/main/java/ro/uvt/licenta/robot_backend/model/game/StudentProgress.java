@@ -30,14 +30,14 @@ public class StudentProgress {
     private Integer score = 0;
 
     @Column(name = "error_count")
-    private Integer errorCount = 0; // Câte greseli a făcut
+    private Integer errorCount = 0;
 
     @Column(name = "needs_help")
-    private Boolean needsHelp = false; // Dacă a apăsat pe butonul de ajutor
+    private Boolean needsHelp = false;
 
     @Column(name = "last_error_details", length = 1000)
-    private String lastErrorDetails; // Detalii despre ultima greșeală pentru profesor
-
+    private String lastErrorDetails;
+    
     @Column(length = 1000)
     private String aiHintHistory = "";
 
