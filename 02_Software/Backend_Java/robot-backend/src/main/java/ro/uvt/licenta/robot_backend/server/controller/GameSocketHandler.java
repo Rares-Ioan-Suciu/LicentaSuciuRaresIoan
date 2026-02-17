@@ -27,7 +27,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        System.out.println("📥 SERVER  A PRIMIT: " + message.getPayload());
+        System.out.println("SERVER  A PRIMIT: " + message.getPayload());
         JsonNode json = objectMapper.readTree(message.getPayload());
         String type = json.get("type").asText();
         String accessCode = json.get("accessCode").asText();
@@ -96,13 +96,13 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 "hint", hint,
                 "timestamp", System.currentTimeMillis()
         ));
-        System.out.println("🤖 [AI DELEGATION] Elev: " + studentName);
+        System.out.println("[AI DELEGATION] Elev: " + studentName);
         System.out.println("   Istoric detectat: " + (history.isEmpty() ? "Niciunul" : history));
         System.out.println("   Răspuns generat: " + hint);
 
         sendToUser(code, studentName, Map.of(
                 "type", "ai_feedback",
-                "message", "🇫🇷 Beatrix: " + hint
+                "message", "Beatrix: " + hint
         ));
     }
 
@@ -203,8 +203,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
         try{
             String payload = objectMapper.writeValueAsString(terminateMessage);
-            System.out.println("📢 [WS DEBUG] Încep broadcast pentru codul: " + accessCode);
-            System.out.println("📢 [WS DEBUG] Sesiuni totale în memorie: " + userSessions.size());
+            System.out.println(" Încep broadcast pentru codul: " + accessCode);
+            System.out.println("Sesiuni totale în memorie: " + userSessions.size());
+
 
             userSessions.forEach((key, session) ->{
                 if(key.startsWith(accessCode + "_") && session.isOpen()) {

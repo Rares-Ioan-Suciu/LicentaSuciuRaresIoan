@@ -60,7 +60,7 @@ public class SessionController {
     public ResponseEntity<String> terminateSession(@PathVariable Long id) {
         try {
             String accessCode = gameSessionService.getSessionAccessCode(id);
-            System.out.println("[CONTROLLER DEBUG] Codul recuperat pentru închidere este: " + accessCode);
+            System.out.println("Codul recuperat pentru închidere este: " + accessCode);
             gameSocketHandler.broadcastSessionTermination(accessCode);
 
             Thread.sleep(1000);

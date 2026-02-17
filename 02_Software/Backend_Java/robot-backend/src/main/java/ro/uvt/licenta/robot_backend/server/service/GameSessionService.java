@@ -162,7 +162,7 @@ public class GameSessionService {
         }
 
         progress.setAiHintHistory(updatedHistory);
-        studentProgressRepository.save(progress); //
+        studentProgressRepository.save(progress);
     }
 
     @Transactional(readOnly = true)
