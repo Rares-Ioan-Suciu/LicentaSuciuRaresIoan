@@ -1,4 +1,4 @@
-package ro.uvt.licenta.robot_backend.config; // Sau pachetul tău corect
+package ro.uvt.licenta.robot_backend.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
