@@ -160,16 +160,14 @@ public class Main {
 
 
         try {
-            // Generăm un fișier HTML temporar
             File testFile = new File("svg_test.html");
             FileWriter writer = new FileWriter(testFile);
             writer.write("<html><body style='background:#f0f0f0; display:flex; justify-content:center; align-items:center; height:100vh;'>");
             writer.write("<div><h2>Test SVG Graph</h2>");
-            writer.write(svgG7.replace("'", "\"")); // Browserul preferă ghilimele duble în HTML
+            writer.write(svgG7.replace("'", "\"")); 
             writer.write("</div></body></html>");
             writer.close();
 
-            // Deschidem fișierul automat în browser
             if (Desktop.isDesktopSupported()) {
                 Desktop.getDesktop().browse(testFile.toURI());
                 System.out.println("✅ Fișierul a fost generat și deschis în browser.");
