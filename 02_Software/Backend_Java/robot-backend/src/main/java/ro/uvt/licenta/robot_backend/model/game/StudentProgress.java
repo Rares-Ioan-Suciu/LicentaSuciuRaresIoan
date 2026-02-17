@@ -37,7 +37,7 @@ public class StudentProgress {
 
     @Column(name = "last_error_details", length = 1000)
     private String lastErrorDetails;
-    
+
     @Column(length = 1000)
     private String aiHintHistory = "";
 
