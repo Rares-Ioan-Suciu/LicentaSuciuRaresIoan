@@ -9,4 +9,9 @@ export default defineConfig({
     // Forțează Vite să nu încarce duplicate ale acestor biblioteci.
     dedupe: ['react', 'react-dom'],
   },
+  // --- ADAUGĂ ASTA PENTRU A PERMITE CONEXIUNEA DE PE TELEFON ---
+  server: {
+    host: true,
+    port: 5173
+  }
 })

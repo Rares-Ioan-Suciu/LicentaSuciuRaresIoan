@@ -10,6 +10,7 @@
 
     import menuBg from '../../assets/bg_menu_grid.jpeg';
     import bakeryBg from '../../assets/bg_bakery_shop.png';
+    import confetti from 'canvas-confetti';
 
     interface FrenchAdventureProps {
         sessionContext?: {
@@ -17,7 +18,7 @@
             username: string;
             accessCode: string;
             levelId?: number;
-        };
+        }; 
     }
 
     const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => {
@@ -107,6 +108,12 @@
             const currentTask = currentTasks[currentTaskIndex];
 
             if (isCorrect) {
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#10b981', '#3b82f6', '#fcd34d']
+                });
                 setHasErrorOnTask(false);
                 const nextScore = score + 100;
                 const nextIndex = currentTaskIndex + 1;

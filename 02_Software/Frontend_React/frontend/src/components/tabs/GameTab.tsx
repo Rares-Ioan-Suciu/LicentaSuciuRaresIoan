@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import FrenchAdventure from '../game/FrenchAdventure';
-import AlgorithmAdventure from '../game/AlgorithmAdventure'; 
+import AlgorithmAdventure from '../game/AlgorithmAdventure';
 import { TeacherService } from '../../services/TeacherService';
 import LiveMonitorGrid from './LiveMonitorGrid';
 import { gtStyles as s } from './TabStyle/GameTabStyles';
@@ -11,12 +11,11 @@ interface SessionData {
     sessionId: number;
     name: string;
     levelTitle?: string;
-    levelId?: number; 
+    levelId?: number;
 }
 
-
 const GameTab = ({ isTeacher }: GameTabProps) => {
-    
+
     const [gameState, setGameState] = useState<'idle' | 'lobby' | 'running'>('idle');
     const [sessionInfo, setSessionInfo] = useState<{ id: number, accessCode: string } | null>(null);
     const [students, setStudents] = useState<Record<string, any>>({});
@@ -86,9 +85,12 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
 
                 if (isTeacher) {
                     if (msg.type === "STUDENT_JOINED" || msg.type === "STUDENT_UPDATE" || msg.type === "STUDENT_NEEDS_HELP") {
+                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+                        audio.play().catch(err => console.warn("Sunetul a fost blocat de browser:", err));
+                        
                         setStudents(prev => ({
                             ...prev,
-                            [msg.data.studentName]: msg.data
+                            [msg.data.studentName]: { ...prev[msg.data.studentName], ...msg.data }
                         }));
                     }
                     else if (msg.type === "AI_HINT_GENERATED") {
@@ -109,7 +111,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                         setActivePin(msg.text);
                     }
                     else if (msg.type === "SESSION_TERMINATED") {
-                        console.log("Sesiunea a fost închisă de profesor.");
                         localStorage.clear();
                         setActiveSession(null);
                         setGameState('idle');
@@ -128,7 +129,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
 
     const handleCreateSession = async () => {
         try {
-            console.log("Am selectat: ", selectedLevelId );
             const data = await TeacherService.createSession(selectedLevelId, "Profesor_Principal");
             setSessionInfo({ id: data.id, accessCode: data.accessCode });
             setGameState('lobby');
@@ -163,7 +163,61 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
         }
     };
 
+    const handleTestRobotVoice = () => {
+        const testMessage = window.prompt("Scrie o propoziție pe care să o citească fața robotului:");
+        if (testMessage && socket?.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: "ROBOT_SPEAK",
+                accessCode: "GLOBAL",
+                text: testMessage
+            }));
+        }
+    };
+
+    // --- LOGICA NOUĂ PENTRU DEPLASAREA ROBOTULUI ---
     const handleActionDelegate = (studentName: string, type: string) => {
+
+        if (type === 'ROBOT_DELEGATE') {
+            setStudents(prev => ({
+                ...prev,
+                [studentName]: { ...prev[studentName], robotOnTheWay: true }
+            }));
+
+            
+            if (socket?.readyState === WebSocket.OPEN && sessionInfo) {
+                socket.send(JSON.stringify({
+                    type: "ROBOT_DISPATCH", 
+                    accessCode: "GLOBAL",
+                    studentData: {
+                        studentName: studentName,
+                        accessCode: sessionInfo.accessCode,
+                        sessionId: sessionInfo.id,
+                        task: students[studentName]?.lastErrorDetails || "Lecție în curs",
+                        details: students[studentName]?.lastErrorDetails || "Fara detalii"
+                    }
+                }));
+            }
+            return;
+        }
+
+        // Dacă profesorul se răzgândește pe drum
+        if (type === 'CANCEL_ROBOT') {
+            setStudents(prev => ({
+                ...prev,
+                [studentName]: { ...prev[studentName], robotOnTheWay: false }
+            }));
+            return;
+        }
+
+        // PASUL 2: A ajuns! Generăm sfatul.
+        if (type === 'AI_DELEGATE') {
+            // Curățăm starea de deplasare
+            setStudents(prev => ({
+                ...prev,
+                [studentName]: { ...prev[studentName], robotOnTheWay: false }
+            }));
+        }
+
         if (socket?.readyState === WebSocket.OPEN && sessionInfo) {
             let textForStudent = "";
             if (type === 'TEACHER_REPLY') {
@@ -178,7 +232,8 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                 accessCode: sessionInfo.accessCode,
                 message: textForStudent,
                 details: textForStudent,
-                task: students[studentName]?.lastErrorDetails || "Lecție în curs"
+                task: students[studentName]?.lastErrorDetails || "Lecție în curs",
+                sessionId: sessionInfo.id
             };
             socket.send(JSON.stringify(payload));
         }
@@ -193,16 +248,11 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
             if (!joinResponse.ok) throw new Error("Cod invalid");
             const progressData = await joinResponse.json();
 
-            console.log("Date Progres primite: ", progressData);
-
             const sessionUrl = `http://localhost:8080/api/sessions/${progressData.sessionId}`;
             const sessionResponse = await fetch(sessionUrl);
             if (!sessionResponse.ok) throw new Error("Nu am putut recupera detaliile sesiunii");
             const sessionDetails = await sessionResponse.json();
 
-            console.log("Detalii Sesiune complete: ", sessionDetails);
-
-          
             const titleFromDB = sessionDetails.gameLevel?.title || "La Boulangerie";
             const idFromDB = sessionDetails.gameLevel?.id || 1;
 
@@ -213,12 +263,10 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                 levelId: idFromDB
             };
 
-          
             setActiveSession(sessionData);
             localStorage.setItem('robot_active_session', JSON.stringify(sessionData));
 
         } catch (e) {
-            console.error("Eroare la join:", e);
             alert("Cod invalid sau sesiune inexistenta!");
             localStorage.removeItem('robot_active_session');
         }
@@ -235,8 +283,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                 {gameState === 'idle' && (
                     <div style={s.centerCard}>
                         <h2 style={{ fontSize: '2.2rem', fontWeight: 900, marginBottom: '10px' }}>Alege jocul!</h2>
-                        <p style={{ color: '#64748b', marginBottom: '20px' }}>Selectează disciplina pentru această sesiune:</p>
-
                         <select
                             title='LevelSelector'
                             value={selectedLevelId}
@@ -246,7 +292,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                             <option value="1">Franceză</option>
                             <option value="2">Informatică</option>
                         </select>
-
                         <button onClick={handleCreateSession} style={s.primaryBtn}>Începe o nouă sesiune!</button>
                     </div>
                 )}
@@ -259,13 +304,7 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                         </div>
                         <div style={s.summaryCard}>
                             <span style={s.summaryLabel}>Solicitări de Ajutor</span>
-                            <span style={{ ...s.summaryValue, color: helpCount > 0 ? '#ef4444' : '#1e293b' }}>
-                                {helpCount}
-                            </span>
-                        </div>
-                        <div style={s.summaryCard}>
-                            <span style={s.summaryLabel}>Scor Mediu Clasă</span>
-                            <span style={s.summaryValue}>{avgScore}</span>
+                            <span style={{ ...s.summaryValue, color: helpCount > 0 ? '#ef4444' : '#1e293b' }}>{helpCount}</span>
                         </div>
                     </div>
                 )}
@@ -274,11 +313,7 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                     <div style={s.centerCard}>
                         <h4 style={{ color: '#94a3b8', letterSpacing: '3px', fontWeight: 800 }}>Cod de Acces</h4>
                         <h1 style={s.accessCodeDisplay}>{sessionInfo.accessCode}</h1>
-                        <p style={{ color: '#64748b', marginBottom: '40px' }}>Partajează codul pentru a lasă elevii să se alăture sesiunii de joc!</p>
-                        <div style={{ display: 'flex', gap: '15px' }}>
-                            <button onClick={() => setGameState('idle')} style={s.secondaryBtn}>Anulează</button>
-                            <button onClick={() => setGameState('running')} style={{ ...s.primaryBtn, background: '#10b981', margin: 0 }}>Start Joc</button>
-                        </div>
+                        <button onClick={() => setGameState('running')} style={{ ...s.primaryBtn, background: '#10b981' }}>Start Joc</button>
                     </div>
                 )}
 
@@ -290,21 +325,14 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                                 value={broadcastText}
                                 onChange={(e) => setBroadcastText(e.target.value)}
                                 placeholder="Mesaj pentru toată lumea..."
-                                onKeyPress={(e) => e.key === 'Enter' && handleSendPin()}
                             />
-                            <button style={s.pinBtn} onClick={handleSendPin}>Trimite Mesaj Tuturor</button>
+                            <button style={s.pinBtn} onClick={handleSendPin}>Trimite Mesaj</button>
+                            <button onClick={handleTestRobotVoice} style={{ ...s.pinBtn, background: '#8b5cf6', color: 'white', marginLeft: '15px' }}>
+                                🗣️ Test Voce
+                            </button>
                             <button onClick={handleTerminate} style={{ ...s.pinBtn, background: '#ef4444', color: 'white', marginLeft: 'auto' }}>Stop Joc</button>
                         </div>
-                        <div style={{ marginBottom: '20px', fontWeight: 800, color: '#64748b' }}>
-                            Sesiune Activă: <span style={{ color: '#1e40af' }}>{sessionInfo.accessCode}</span>
-                        </div>
-                    
-                        <LiveMonitorGrid
-                            students={studentList}
-                            accessCode={sessionInfo.accessCode}
-                    
-                            onAction={handleActionDelegate}
-                        />
+                        <LiveMonitorGrid students={studentList} accessCode={sessionInfo.accessCode} onAction={handleActionDelegate} />
                     </div>
                 )}
             </div>
@@ -313,45 +341,23 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
 
     return (
         <div style={s.wrapper}>
-            {activePin && (
-                <div style={s.pinBanner}>
-                    <span style={{ fontWeight: 900, color: '#92400e', fontSize: '1.1rem' }}>📢 MESAJ PROFESOR: {activePin}</span>
-                    <button onClick={() => setActivePin(null)} style={{ background: 'rgba(0,0,0,0.1)', border: 'none', padding: '8px 12px', borderRadius: '10px', cursor: 'pointer', fontWeight: '800' }}>✕</button>
-                </div>
-            )}
-
             {!activeSession ? (
                 <div style={s.centerCard}>
                     <h2 style={{ fontWeight: 900, marginBottom: '30px' }}>Conectare la Joc</h2>
                     <input style={s.bigInput} value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Numele tău" />
-                    <input style={{ ...s.bigInput, textAlign: 'center', fontWeight: '900', letterSpacing: '6px' }} value={studentCode} onChange={(e) => setStudentCode(e.target.value.toUpperCase())} placeholder="Cod de acces" />
+                    <input style={{ ...s.bigInput, textAlign: 'center', fontWeight: '900', letterSpacing: '6px' }} value={studentCode} onChange={(e) => setStudentCode(e.target.value.toUpperCase())} placeholder="Cod" />
                     <button onClick={handleJoinGame} style={{ ...s.primaryBtn, marginTop: '30px' }}>Intră în joc</button>
                 </div>
             ) : (
-                <div style={{ marginTop: activePin ? '100px' : '0', width: '100%' }}>
+                <div style={{ width: '100%' }}>
                     {activeSession.levelTitle?.toLowerCase().includes("informatica") ? (
-                        <AlgorithmAdventure
-                            sessionContext={{
-                                sessionId: activeSession.sessionId,
-                                username: activeSession.name,
-                                accessCode: studentCode,
-                                levelId: activeSession.levelId
-                            }}
-                        />
+                        <AlgorithmAdventure sessionContext={{ sessionId: activeSession.sessionId, username: activeSession.name, accessCode: studentCode, levelId: activeSession.levelId }} />
                     ) : (
-                        <FrenchAdventure
-                            sessionContext={{
-                                sessionId: activeSession.sessionId,
-                                username: activeSession.name,
-                                accessCode: studentCode,
-                                levelId: activeSession.levelId
-                            }}
-                        />
+                        <FrenchAdventure sessionContext={{ sessionId: activeSession.sessionId, username: activeSession.name, accessCode: studentCode, levelId: activeSession.levelId }} />
                     )}
                 </div>
             )}
         </div>
     );
 };
-
 export default GameTab;

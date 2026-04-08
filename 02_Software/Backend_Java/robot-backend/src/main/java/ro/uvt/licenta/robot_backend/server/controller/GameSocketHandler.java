@@ -22,15 +22,21 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final GameSessionService gameSessionService;
     private final OpenAIService openAIService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final String ESP32_IP = "192.168.1.140"; // Asigură-te că IP-ul ESP32 este corect aici!
 
     private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
 
+    private volatile String stationedStudent = null;
+    private volatile String stationedAccessCode = null;
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        System.out.println("SERVER  A PRIMIT: " + message.getPayload());
+        System.out.println("SERVER A PRIMIT: " + message.getPayload());
         JsonNode json = objectMapper.readTree(message.getPayload());
         String type = json.get("type").asText();
-        String accessCode = json.get("accessCode").asText();
+
+        // Robotul folosește "GLOBAL", elevii folosesc codul sesiunii
+        String accessCode = json.path("accessCode").asText("GLOBAL");
 
         switch (type) {
             case "JOIN":
@@ -54,11 +60,34 @@ public class GameSocketHandler extends TextWebSocketHandler {
             case "TEACHER_REPLY":
                 handleTeacherReply(json, accessCode);
                 break;
+            case "ROBOT_SPEAK":
+                sendToUser("GLOBAL", "robot", Map.of(
+                        "type", "VOICE_HINT",
+                        "message", json.get("text").asText(),
+                        "lang", "ro-RO"
+                ));
+                break;
+            case "ROBOT_DISPATCH":
+                // Profesorul trimite robotul. Noi trimitem datele către Fața Robotului
+                sendToUser("GLOBAL", "robot", Map.of(
+                        "type", "ROBOT_DISPATCHED",
+                        "studentData", json.get("studentData")
+                ));
+                break;
+            case "ROBOT_ENGAGED":
+                // Elevul a apăsat butonul verde pe robot. Robotul devine Tutor Oficial!
+                stationedStudent = json.has("studentName") ? json.get("studentName").asText() : json.get("username").asText();
+                stationedAccessCode = accessCode;
+
+                // Generăm automat PRIMUL indiciu de la AI
+                handleAiDelegation(json, accessCode);
+                break;
         }
     }
 
     private void handleAiDelegation(JsonNode json, String code) throws Exception {
-        String studentName = json.path("studentName").asText("Elev");
+        // Suportăm ambele denumiri pentru flexibilitate (din React vin diferit uneori)
+        String studentName = json.has("studentName") ? json.path("studentName").asText("Elev") : json.path("username").asText("Elev");
         String taskRequirement = json.path("task").asText("Nespecificată");
         Long sessionId = json.path("sessionId").asLong();
 
@@ -70,6 +99,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 System.err.println("Eroare la parsarea detaliilor JSON: " + e.getMessage());
             }
         }
+
         StudentProgress progress = gameSessionService.getStudentProgress(code, studentName);
         String history = progress.getAiHintHistory() != null ? progress.getAiHintHistory() : "";
 
@@ -80,15 +110,10 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
         String fullContext = String.format(
                 "Cerință: %s | Context Întrebare: %s | Răspuns Corect: %s | Răspuns Elev: %s | Detalii Extra: %s",
-                taskRequirement,
-                question,
-                correctAnswer,
-                studentAnswer,
-                extraContext
+                taskRequirement, question, correctAnswer, studentAnswer, extraContext
         );
 
         String hint = openAIService.generateAIHint(fullContext, taskRequirement, history);
-
         gameSessionService.addAiHintToHistory(code, studentName, hint);
 
         notifyTeacher(code, "AI_HINT_GENERATED", Map.of(
@@ -96,14 +121,74 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 "hint", hint,
                 "timestamp", System.currentTimeMillis()
         ));
-        System.out.println("[AI DELEGATION] Elev: " + studentName);
-        System.out.println("   Istoric detectat: " + (history.isEmpty() ? "Niciunul" : history));
-        System.out.println("   Răspuns generat: " + hint);
 
+        // Trimitem feedback-ul text la elev pe laptop
         sendToUser(code, studentName, Map.of(
                 "type", "ai_feedback",
                 "message", "Beatrix: " + hint
         ));
+
+        // Trimitem feedback-ul VOCAL către Fața Robotului
+        sendToUser("GLOBAL", "robot", Map.of(
+                "type", "VOICE_HINT",
+                "message", hint,
+                "lang", "ro-RO"
+        ));
+    }
+
+    private void handleWrongAnswer(JsonNode json, String code) throws Exception {
+        String studentName = json.get("username").asText();
+        JsonNode detailsNode = json.get("details");
+
+        String detailsStr = detailsNode.isObject() ? detailsNode.toString() : detailsNode.asText();
+        int taskIndex = json.get("taskIndex").asInt();
+
+        StudentProgress update = gameSessionService.updateStudentStatus(
+                json.get("sessionId").asLong(), studentName, taskIndex, true, detailsStr
+        );
+        notifyTeacher(code, "STUDENT_UPDATE", update);
+
+
+        if (studentName.equals(stationedStudent) && code.equals(stationedAccessCode)) {
+            System.out.println("[ROBOT] Elevul mentorat a greșit! Cer un nou sfat AI.");
+
+            // 1. Dăm comanda de Emote 2 (Supărare/Negare) către ESP32 și un mic oftat vocal
+            triggerESP32Emote(2); // Declanșează eșec pe mașinuță
+
+            sendToUser("GLOBAL", "robot", Map.of(
+                    "type", "VOICE_HINT",
+                    "message", "Of, nu e chiar așa! Lasă-mă să mă gândesc la alt indiciu...",
+                    "lang", "ro-RO"
+            ));
+
+            handleAiDelegation(json, code);
+        }
+    }
+
+    private void handleUpdateProgress(JsonNode json, String accessCode) throws Exception {
+        String studentName = json.get("username").asText();
+        Long sessionId = json.get("sessionId").asLong();
+        int taskIndex = json.get("taskIndex").asInt();
+        int score = json.get("score").asInt();
+
+        StudentProgress updated = gameSessionService.updateStudentProgress(sessionId, studentName, taskIndex, score);
+        notifyTeacher(accessCode, "STUDENT_UPDATE", updated);
+
+        if (studentName.equals(stationedStudent) && accessCode.equals(stationedAccessCode)) {
+            System.out.println("[ROBOT] Elevul mentorat a reușit! Eliberez robotul.");
+
+            triggerESP32Emote(1); // Declanșează victorie pe mașinuță
+
+            // 2. Fața de pe telefon felicită copilul
+            sendToUser("GLOBAL", "robot", Map.of(
+                    "type", "VOICE_HINT",
+                    "message", "Excelent! Răspuns perfect! Misiune îndeplinită, mă întorc la bază.",
+                    "lang", "ro-RO"
+            ));
+
+            stationedStudent = null;
+            stationedAccessCode = null;
+        }
     }
 
     private void handleTeacherReply(JsonNode json, String accessCode) throws Exception {
@@ -131,16 +216,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
         });
     }
 
-    private void handleUpdateProgress(JsonNode json, String accessCode) throws Exception {
-        String studentName = json.get("username").asText();
-        Long sessionId = json.get("sessionId").asLong();
-        int taskIndex = json.get("taskIndex").asInt();
-        int score = json.get("score").asInt();
-
-        StudentProgress updated = gameSessionService.updateStudentProgress(sessionId, studentName, taskIndex, score);
-        notifyTeacher(accessCode, "STUDENT_UPDATE", updated);
-    }
-
     private void handleHelpRequest(JsonNode json, String accessCode) throws Exception {
         String studentName = json.get("username").asText();
         Long sessionId = json.get("sessionId").asLong();
@@ -159,19 +234,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
             StudentProgress progress = gameSessionService.joinSession(code, username);
             notifyTeacher(code, "STUDENT_JOINED", progress);
         }
-    }
-
-    private void handleWrongAnswer(JsonNode json, String code) throws Exception {
-        String studentName = json.get("username").asText();
-        JsonNode detailsNode = json.get("details");
-
-        String detailsStr = detailsNode.isObject() ? detailsNode.toString() : detailsNode.asText();
-        int taskIndex = json.get("taskIndex").asInt();
-
-        StudentProgress update = gameSessionService.updateStudentStatus(
-                json.get("sessionId").asLong(), studentName, taskIndex, true, detailsStr
-        );
-        notifyTeacher(code, "STUDENT_UPDATE", update);
     }
 
     private void notifyTeacher(String accessCode, String type, Object data) throws Exception {
@@ -204,8 +266,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
         try{
             String payload = objectMapper.writeValueAsString(terminateMessage);
             System.out.println(" Încep broadcast pentru codul: " + accessCode);
-            System.out.println("Sesiuni totale în memorie: " + userSessions.size());
-
 
             userSessions.forEach((key, session) ->{
                 if(key.startsWith(accessCode + "_") && session.isOpen()) {
@@ -213,12 +273,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
                         synchronized (session) {
                             session.sendMessage(new TextMessage(payload));
                         }
-                        System.out.println("✅ [WS DEBUG] Trimis către: " + key);
                     } catch (Exception e) {
-                        System.err.println("Eroare la trimiterea notificării de închidere către: " + key);
+                        System.err.println("Eroare la trimitere");
                     }
-                } else {
-                    System.out.println("❌ [WS DEBUG] Sesiune închisă pentru: " + key);
                 }
             });
         } catch (Exception e) {
@@ -229,5 +286,24 @@ public class GameSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         userSessions.values().remove(session);
+    }
+
+    private void triggerESP32Emote(int emoteId) {
+        // Un thread nou funcționează exact ca un Promise în Javascript (asincron)
+        new Thread(() -> {
+            try {
+                String url = "http://" + ESP32_IP + "/emote?id=" + emoteId;
+                System.out.println("[ESP32 FETCH] Trimit comanda către: " + url);
+
+                // Echivalentul lui fetch() în Spring Boot
+                org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+                String response = restTemplate.getForObject(url, String.class);
+
+                System.out.println("[ESP32 SUCCESS] Robotul a dansat! Răspuns: " + response);
+            } catch (Exception e) {
+                // Echivalentul lui .catch() din React
+                System.err.println("[ESP32 ERROR] Nu am putut mișca robotul: " + e.getMessage());
+            }
+        }).start();
     }
 }

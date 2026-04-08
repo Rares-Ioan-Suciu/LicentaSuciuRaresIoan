@@ -7,6 +7,8 @@ import LoadingScreen from './components/LoadingScreen';
 import ProtectedRoute from './components/ProtectedRoute';
 import Register from './pages/Register';
 import TeacherDashboard from './pages/TeacherDashboard';
+import {RobotTab} from './components/tabs/RobotTab';
+import {RobotFace} from './components/tabs/RobotFace';
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const Classes = lazy(() => import('./pages/Classes'));          
 const ClassDetails = lazy(() => import('./pages/ClassDetails')); 
@@ -40,6 +42,9 @@ function App() {
           <Route element={<ProtectedRoute role="teacher" />}>
             <Route path="/teacher" element={<TeacherDashboard />} />
           </Route>
+
+          <Route path="/robot" element={<RobotTab />} />
+          <Route path="/face" element={<RobotFace />} />
 
           <Route path="/classes" element={<Classes />} />
           <Route path="/classes/:id" element={<ClassDetails />} />

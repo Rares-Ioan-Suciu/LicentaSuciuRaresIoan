@@ -66,6 +66,27 @@ export default function TeacherDashboard() {
             Gestionare Cursuri
           </button>
 
+          {/* --- NOU: Buton acces general Robot --- */}
+          <button
+            onClick={() => window.open('/robot', '_blank')}
+            style={{
+              padding: "15px 30px",
+              fontSize: "16px",
+              fontWeight: "600",
+              color: "#fff",
+              backgroundColor: "#28a745",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              transition: "background 0.2s",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#218838")}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#28a745")}
+          >
+            🤖 Conducere Robot
+          </button>
+
         </div>
       </div>
     </div>

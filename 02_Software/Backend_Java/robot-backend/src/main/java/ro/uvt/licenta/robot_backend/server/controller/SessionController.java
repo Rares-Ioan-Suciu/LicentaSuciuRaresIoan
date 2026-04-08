@@ -78,4 +78,11 @@ public class SessionController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @GetMapping("/code/{code}")
+    public ResponseEntity<GameSession> getSessionByCode(@PathVariable String code) {
+        return gameSessionService.findByAccessCode(code)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

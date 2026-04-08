@@ -173,12 +173,15 @@ public class GameSessionService {
     }
 
     private String generateCode() {
-
         return UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 
     public Optional<GameSession> findById(Long id) {
         return gameSessionRepository.findById(id);
+    }
+
+    public Optional<GameSession> findByAccessCode(String accessCode) {
+        return gameSessionRepository.findByAccessCodeAndActiveTrue(accessCode);
     }
 
 }
