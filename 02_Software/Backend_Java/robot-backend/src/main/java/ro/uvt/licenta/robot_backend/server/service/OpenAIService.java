@@ -22,24 +22,34 @@ public class OpenAIService {
     private final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public String generateAIHint(String studentError, String taskName, String history) {
+    public String generateAIHint(String studentContext, String taskName, String history) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        String systemPrompt = String.format(
-                "Ești un profesor expert de limba franceză integrat într-un asistent educațional. " +
-                        "Sarcina ta este să analizezi eroarea elevului la exercițiul: %s.\n\n" +
-                        "REGULI DE AUR:\n" +
-                        "1. Vorbește strict despre limba franceză (gen, număr, conjugare, vocabular).\n" +
-                        "2. NU da răspunsul direct sub nicio formă.\n" +
-                        "3. Oferă un indiciu socratic în limba română, scurt și clar (max 15 cuvinte).\n" +
-                        "4. Folosește terminologie pedagogică simplă (ex: 'acordul adjectivului', 'articol masculin').\n\n" +
-                        "CONTEXT: %s",
-                taskName, studentError
-        );
+        // 1. PERSONALITATEA LUI BEATRIX (Agnostică față de materie)
+        String systemPrompt = """
+                Ești Beatrix, un asistent educațional robot, prietenos, empatic și puțin amuzant.
+                Vorbești cu un elev care s-a blocat la un exercițiu interactiv.
+                
+                REGULI STRICTE:
+                1. Fii scurtă și la obiect (maxim 2-3 propoziții). Vei fi auzită prin Text-to-Speech, deci folosește un limbaj natural.
+                2. NU da niciodată răspunsul corect direct! Oferă un indiciu logic, o analogie sau pune o întrebare ajutătoare.
+                3. Folosește un ton cald, încurajator (ex: "Ești pe aproape!", "Ai grijă la...").
+                4. Adaptează-te materiei automat (dacă vezi cuvinte în franceză, explică reguli de limbă; dacă vezi algoritmi, explică logica).
+                5. CRITIC: Dacă vezi în 'Istoric' că elevul a mai primit indicii, SCHIMBĂ abordarea! Fii mai explicită sau dă un exemplu concret ca să nu-l frustrezi.
+                """;
 
-        String userMessage = String.format("Am făcut următoarea eroare: '%s'. Ajută-mă!", studentError);
+        // 2. STRUCTURARE CLARĂ A DATELOR PENTRU AI
+        String userMessage = String.format(
+                "Exercițiul curent: %s\n\n" +
+                        "Contextul și eroarea elevului: %s\n\n" +
+                        "Istoric indicii deja oferite: %s\n\n" +
+                        "Te rog, oferă-i elevului următorul indiciu în limba română:",
+                taskName,
+                studentContext,
+                (history != null && !history.isBlank()) ? history : "Niciunul (este prima greșeală la acest task)"
+        );
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", MODEL);
@@ -47,7 +57,7 @@ public class OpenAIService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userMessage)
         ));
-        requestBody.put("temperature", 0.7);
+        requestBody.put("temperature", 0.8);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
@@ -55,18 +65,18 @@ public class OpenAIService {
             ResponseEntity<Map> response = restTemplate.postForEntity(ENDPOINT, entity, Map.class);
             return extractContentFromResponse(response.getBody());
         } catch (Exception e) {
-            e.printStackTrace();
-            return "Bip-bop! Momentan am circuitele ocupate. Mai încearcă o dată!";
+            System.err.println("[OpenAI Error] " + e.getMessage());
+            return "Bip-bop! Momentan am circuitele puțin încurcate. Mai citește o dată cerința cu atenție!";
         }
     }
 
     private String extractContentFromResponse(Map responseBody) {
         if (responseBody == null || !responseBody.containsKey("choices"))
-            return "Nu am putut genera un indiciu.";
+            return "Hmm, nu sunt sigură cum să explic asta. Mai încearcă o dată!";
 
         List choices = (List) responseBody.get("choices");
         if (choices == null || choices.isEmpty())
-            return "Nu am putut genera un indiciu.";
+            return "Hmm, nu sunt sigură cum să explic asta. Mai încearcă o dată!";
 
         Map firstChoice = (Map) choices.get(0);
         Map message = (Map) firstChoice.get("message");

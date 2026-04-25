@@ -17,11 +17,21 @@ function App() {
   const [isAppLoading, setIsAppLoading] = useState(true);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = params.get('join');
+    if (joinCode) {
+      localStorage.setItem('magic_join_code', joinCode);
+    }
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       setIsAppLoading(false);
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+
 
   if (isAppLoading) {
     return <LoadingScreen />;

@@ -1,8 +1,9 @@
-
 export const gtStyles: any = {
     wrapper: {
-        padding: '40px 20px',
-        maxWidth: '1300px',
+        padding: '20px 2%', // Padding mai fin pentru a lăsa spațiu lateral cardurilor
+        maxWidth: '96%',     // AM SCHIMBAT AICI: Ocupă 96% din lățimea ecranului!
+        width: '100%',       // Forțează expandarea
+        boxSizing: 'border-box',
         margin: '0 auto',
         fontFamily: "'Inter', 'Segoe UI', sans-serif",
         color: '#1e293b',
@@ -68,7 +69,9 @@ export const gtStyles: any = {
         alignItems: 'center',
         marginBottom: '40px',
         boxShadow: '0 10px 15px -3px rgba(30, 64, 175, 0.3)',
-        borderBottom: '4px solid #1e3a8a'
+        borderBottom: '4px solid #1e3a8a',
+        width: '100%', // Asigură-te că bara se întinde și ea la fel ca grila
+        boxSizing: 'border-box'
     },
 
     broadcastInput: {
@@ -126,6 +129,7 @@ export const gtStyles: any = {
         display: 'flex',
         gap: '20px',
         marginBottom: '30px',
+        width: '100%',
     },
 
     summaryCard: {
@@ -141,9 +145,6 @@ export const gtStyles: any = {
 
     summaryLabel: { fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' },
     summaryValue: { fontSize: '1.4rem', fontWeight: 900, color: '#1e293b' },
-
-
-
 };
 
 export const injectGlobalStyles = () => {

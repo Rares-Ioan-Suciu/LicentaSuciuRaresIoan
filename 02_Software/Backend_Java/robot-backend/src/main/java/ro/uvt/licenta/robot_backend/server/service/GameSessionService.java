@@ -101,16 +101,45 @@ public class GameSessionService {
 
         List<StudentProgress> results = studentProgressRepository.findAllBySession(session);
 
+        String levelTitle = session.getGameLevel().getTitle().toLowerCase();
+        int totalTasks = (levelTitle.contains("info") || levelTitle.contains("grafuri")) ? 24 : 25;
+
         StringBuilder csv = new StringBuilder();
-        csv.append("Nume Elev,Scor Final,Greșeli Totale,Ultima Etapă,Detalii Erori\n");
+        csv.append("Nume Elev,Progres (%),Status,Greseli Totale,Interventii AI,Acuratete (%),Ultima Eroare Inregistrata\n");
 
         for (StudentProgress p : results) {
-            csv.append(String.format("%s,%d,%d,%d,\"%s\"\n",
+            int currentTask = p.getCurrentTaskIndex();
+            int progressPercent = (int) Math.round((double) currentTask / totalTasks * 100);
+
+            if (progressPercent > 100) progressPercent = 100;
+            String status = (currentTask >= totalTasks - 1) ? "Finalizat" : "In lucru";
+            int aiHintsCount = 0;
+            if (p.getAiHintHistory() != null && !p.getAiHintHistory().isEmpty()) {
+                aiHintsCount = p.getAiHintHistory().split("\\|").length;
+            }
+            int accuracy = 100;
+            if (p.getErrorCount() > 0) {
+                int penalty = p.getErrorCount() * 10;
+                accuracy = Math.max(0, 100 - penalty);
+            }
+
+            String cleanError = "Nu a intampinat probleme";
+            if (p.getLastErrorDetails() != null) {
+                cleanError = p.getLastErrorDetails()
+                        .replace("\"", "'")
+                        .replace("{", "")
+                        .replace("}", "")
+                        .replace("\n", " ");
+            }
+
+            csv.append(String.format("%s,%d%%,%s,%d,%d,%d%%,\"%s\"\n",
                     p.getStudentName(),
-                    p.getScore(),
+                    progressPercent,
+                    status,
                     p.getErrorCount(),
-                    p.getCurrentTaskIndex() + 1,
-                    p.getLastErrorDetails() != null ? p.getLastErrorDetails().replace("\"", "'") : "Nicio eroare"
+                    aiHintsCount,
+                    accuracy,
+                    cleanError
             ));
         }
         return csv.toString();

@@ -50,6 +50,7 @@ const ClassDetails = () => {
     useEffect(() => {
         if (id && token) fetchData();
     }, [id, user]);
+
     const handlePost = async (content: string) => {
         if (!content) return;
         await fetch(`http://localhost:8080/api/v1/classes/${id}/announcements`, {
@@ -59,6 +60,7 @@ const ClassDetails = () => {
         });
         fetchData();
     };
+
     const handleInvite = async (email: string) => {
         if (!email) return;
         const res = await fetch(`http://localhost:8080/api/v1/classes/${id}/invite`, {
@@ -95,13 +97,13 @@ const ClassDetails = () => {
                         onClick={() => setActiveTab('stream')}
                         style={activeTab === 'stream' ? styles.activeTab : styles.tab}
                     >
-                     Discuții
+                        Discuții
                     </button>
                     <button
                         onClick={() => setActiveTab('people')}
                         style={activeTab === 'people' ? styles.activeTab : styles.tab}
                     >
-                    Studenți
+                        Studenți
                     </button>
 
                     <button
@@ -113,7 +115,12 @@ const ClassDetails = () => {
                 </div>
             </div>
 
-            <div style={styles.mainContent}>
+            {/* AICI E MAGIA: Containerul devine dinamic în funcție de tab-ul selectat */}
+            <div style={{
+                ...styles.mainContent,
+                maxWidth: activeTab === 'game' ? '100%' : '1000px', // Full screen pt Joc, 1000px pt restul
+                padding: activeTab === 'game' ? '0' : '30px 20px'   // Scoatem paddingul dublu pt Joc
+            }}>
                 {activeTab === 'stream' && (
                     <StreamTab
                         classroom={classroom}
@@ -147,7 +154,8 @@ const styles = {
     tabContainer: { maxWidth: '1000px', margin: '0 auto', display: 'flex', gap: '30px', padding: '0 20px' },
     tab: { background: 'none', border: 'none', borderBottom: '3px solid transparent', padding: '15px 5px', fontSize: '1rem', color: '#666', cursor: 'pointer', fontWeight: 500, transition: 'all 0.2s' },
     activeTab: { background: 'none', border: 'none', borderBottom: '3px solid #000', padding: '15px 5px', fontSize: '1rem', color: '#000', cursor: 'pointer', fontWeight: 700 },
-    mainContent: { maxWidth: '1000px', margin: '0 auto', padding: '30px 20px' },
+
+    mainContent: { margin: '0 auto', transition: 'max-width 0.3s ease' },
 };
 
 export default ClassDetails;

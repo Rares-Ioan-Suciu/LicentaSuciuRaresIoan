@@ -24,6 +24,7 @@ public class BakeryLevelInitializer {
             GameTaskRepository gameTaskRepository,
             JdbcTemplate jdbcTemplate) {
         return args -> {
+            // Păstrăm titlul exact cum era pentru a nu strica Frontend-ul
             String levelTitle = "La Boulangerie";
 
             if (gameLevelRepository.findByTitle(levelTitle).isPresent()) {
@@ -32,13 +33,14 @@ public class BakeryLevelInitializer {
             }
 
             System.out.println("LOG: Resetare totală bază de date");
-            jdbcTemplate.execute("TRUNCATE TABLE game_levels RESTART IDENTITY CASCADE");
-            System.out.println("LOG:  Baza de date este curată. ID-ul următor va fi 1.");
+            // jdbcTemplate.execute("TRUNCATE TABLE game_levels RESTART IDENTITY CASCADE");
+            System.out.println("LOG: Baza de date este pregătită.");
 
-            System.out.println("Creem Scenariul '" + levelTitle);
+            System.out.println("Creem Scenariul '" + levelTitle + "'");
+            // Păstrăm setările de bază ale nivelului
             GameLevel bakeryLevel = GameLevel.builder()
                     .title(levelTitle)
-                    .description("Scenariu pentru brutarie")
+                    .description("Mission secrète: Remplissez vos objectifs à Paris en parlant français.")
                     .imageUrl("/assets/bg_bakery_shop.png")
                     .difficulty(1)
                     .build();
@@ -47,167 +49,164 @@ public class BakeryLevelInitializer {
             List<GameTask> tasks = new ArrayList<>();
             ObjectMapper mapper = new ObjectMapper();
 
-            tasks.add(createTask(bakeryLevel, 1, TaskType.MultipleChoice,
-                    "Ai intrat în magazin. Ce spui?",
-                    "În Franța, salutăm mereu când intrăm. Spune 'Bonjour'.",
-                    Map.of("options", List.of("Noapte bună!", "Pa!", "Bonjour!", "Nimic"), "correctAnswer", "Bonjour!"), mapper));
+            // ==========================================
+            // ZONA 1: LA BOULANGERIE (Brutăria)
+            // ==========================================
+            String imgBakery = "/assets/bg_bakery_shop.png";
+
+            tasks.add(createTask(bakeryLevel, 1, TaskType.VisualID,
+                    "HQ: Cible localisée. Cliquez sur le Boulanger pour initier le contact.",
+                    "Caută persoana cu șorț alb din spatele tejghelei.",
+                    Map.of("targetZone", Map.of("x", 410, "y", 475, "width", 410, "height", 525), "wrongZones", List.of("window", "bread"), "imageUrl", imgBakery), mapper));
 
             tasks.add(createTask(bakeryLevel, 2, TaskType.MultipleChoice,
-                    "Vânzătorul este un bărbat. Cum îl saluți politicos?",
-                    "Pentru bărbați adăugăm 'Monsieur'.",
-                    Map.of("options", List.of("Bonjour, Madame!", "Bonjour, Monsieur!", "Salut, băiete!", "Bonjour, Papa!"), "correctAnswer", "Bonjour, Monsieur!"), mapper));
+                    "Vous entrez dans la boulangerie. Que dites-vous en premier ?",
+                    "În Franța, salutăm mereu când intrăm. Spune 'Bonjour'.",
+                    Map.of("options", List.of("Bonne nuit!", "Au revoir!", "Bonjour!", "Je veux du pain."), "correctAnswer", "Bonjour!", "imageUrl", imgBakery), mapper));
 
             tasks.add(createTask(bakeryLevel, 3, TaskType.MultipleChoice,
-                    "Unde te afli acum?",
-                     "Magazinul de pâine se numește Boulangerie.",
-                    Map.of("options", List.of("La Farmacie", "La Școală", "La Boulangerie", "La Cinema"), "correctAnswer", "La Boulangerie"), mapper));
+                    "Le vendeur est un homme. Comment le saluer poliment ?",
+                    "Pentru bărbați adăugăm 'Monsieur'.",
+                    Map.of("options", List.of("Bonjour, Madame!", "Bonjour, Monsieur!", "Salut, garçon!", "Coucou!"), "correctAnswer", "Bonjour, Monsieur!", "imageUrl", imgBakery), mapper));
 
-            tasks.add(createTask(bakeryLevel, 4, TaskType.VisualID,
-                    "Apasă pe vânzător (Le Boulanger) pentru a începe.",
-                    "Este persoana cu șorț alb din spatele tejghelei.",
-                    Map.of("targetZone", Map.of(
-                            "x", 410,
-                            "y", 475,
-                            "width", 410,
-                            "height", 525
-                    ), "wrongZones", List.of("window", "bread")), mapper));
+            tasks.add(createTask(bakeryLevel, 4, TaskType.MultipleChoice,
+                    "Le boulanger demande : 'Comment ça va ?'. Quelle est la bonne réponse ?",
+                    "Înseamnă 'Ce mai faci?'. Răspunde că ești bine.",
+                    Map.of("options", List.of("Je ne sais pas.", "Ça va bien, merci.", "Au revoir.", "Je suis un agent."), "correctAnswer", "Ça va bien, merci.", "imageUrl", imgBakery), mapper));
 
-            tasks.add(createTask(bakeryLevel, 5, TaskType.MultipleChoice,
-                    "Brutarul te întreabă: 'Comment ça va?'. Ce răspunzi?",
-                    "Înseamnă 'Ce mai faci?'. Răspunde că ești bine (Bien).",
-                    Map.of("options", List.of("Nu știu.", "Ça va bien, merci.", "La revedere.", "Bonjour."), "correctAnswer", "Ça va bien, merci."), mapper));
+            tasks.add(createTask(bakeryLevel, 5, TaskType.VisualID,
+                    "Mission: Trouvez les produits sucrés. Cliquez sur 'Les Croissants'.",
+                    "Au formă de semilună. (Croissant)",
+                    Map.of("targetZone", Map.of("x", 55, "y", 550, "width", 490, "height", 90), "wrongZones", List.of("baguette"), "imageUrl", imgBakery), mapper));
 
-            tasks.add(createTask(bakeryLevel, 6, TaskType.VisualID,
-                    "Unde sunt 'Les Croissants' ?",
-                    "Au formă de semilună.",
-                    Map.of("targetZone", Map.of(
-                            "x", 55,
-                            "y", 550,
-                            "width", 490,
-                            "height", 90
-                    ), "wrongZones", List.of("baguette")), mapper));
+            tasks.add(createTask(bakeryLevel, 6, TaskType.SentenceBuilder,
+                    "Donnez le mot de passe: 'Je voudrais un croissant'.",
+                    "Așează cuvintele în ordine: Eu aș dori un croissant.",
+                    Map.of("words", List.of("Je", "voudrais", "un", "croissant", "tu", "il"),
+                            "correctOrder", List.of("Je", "voudrais", "un", "croissant"), "imageUrl", imgBakery), mapper));
+
+            tasks.add(createTask(bakeryLevel, 7, TaskType.DragAndDrop,
+                    "Test de couverture: Classez les produits (Sucré = Dulce, Salé = Sărat).",
+                    "Tarta e dulce (sucré). Sandwich-ul e sărat (salé).",
+                    Map.of("items", List.of(
+                            Map.of("id", "i1", "text", "Tarte aux fruits", "category", "Sucré"),
+                            Map.of("id", "i2", "text", "Sandwich", "category", "Salé"),
+                            Map.of("id", "i3", "text", "Éclair", "category", "Sucré")
+                    ), "zones", List.of("Sucré", "Salé"), "imageUrl", imgBakery), mapper));
 
             tasks.add(createTask(bakeryLevel, 8, TaskType.MultipleChoice,
-                    "Cum se numește produsul pătrat cu ciocolată?",
-                    "Nu e croissant. Se numește Pâine cu ciocolată.",
-                    Map.of("options", List.of("Croissant", "Sandwich", "Pain au chocolat", "Pizza"), "correctAnswer", "Pain au chocolat"), mapper));
+                    "Quel est le produit carré avec du chocolat ?",
+                    "Nu e croissant. Se numește Pâine cu ciocolată (Pain au chocolat).",
+                    Map.of("options", List.of("Croissant", "Sandwich", "Pain au chocolat", "Baguette"), "correctAnswer", "Pain au chocolat", "imageUrl", imgBakery), mapper));
 
-            tasks.add(createTask(bakeryLevel, 9, TaskType.DragAndDrop,
-                    "Sortează produsele: Dulce (Sucré) sau Sărat (Salé)?",
-                    "Tarta e dulce. Sandwich-ul e sărat.",
-                    Map.of("items", List.of(
-                            Map.of("id", "i1", "text", "Tarte aux fruits", "category", "sweet"),
-                            Map.of("id", "i2", "text", "Sandwich", "category", "salty"),
-                            Map.of("id", "i3", "text", "Eclair", "category", "sweet")
-                    ), "zones", List.of("sweet", "salty")), mapper));
+            tasks.add(createTask(bakeryLevel, 9, TaskType.MultipleChoice,
+                    "Le boulanger dit : 'Ça fait 2 Euros'. Que devez-vous payer ?",
+                    "Deux = 2.",
+                    Map.of("options", List.of("1 Euro", "2 Euros", "5 Euros", "10 Euros"), "correctAnswer", "2 Euros", "imageUrl", imgBakery), mapper));
 
-            tasks.add(createTask(bakeryLevel, 10, TaskType.MultipleChoice,
-                    "Din ce este făcută pâinea?",
-                    "Făină se spune 'Farine'.",
-                    Map.of("options", List.of("Apă și Zahăr", "Carne", "Farine (Făină)", "Ciocolată"), "correctAnswer", "Farine (Făină)"), mapper));
+            tasks.add(createTask(bakeryLevel, 10, TaskType.SentenceBuilder,
+                    "Avant de partir, soyez poli: 'Merci, au revoir !'",
+                    "Mulțumesc, la revedere!",
+                    Map.of("words", List.of("Merci,", "au", "revoir", "bonjour", "!"),
+                            "correctOrder", List.of("Merci,", "au", "revoir", "!"), "imageUrl", imgBakery), mapper));
+
+
+            // ==========================================
+            // ZONA 2: LE COMMISSARIAT (Strada / Poliția)
+            // ==========================================
+            String imgGendarme = "/assets/bg_gendarme_street.jpg";
 
             tasks.add(createTask(bakeryLevel, 11, TaskType.MultipleChoice,
-                    "Croissant este masculin. Cum spui 'Un croissant'?",
-                    "Folosim 'Un' pentru masculin.",
-                    Map.of("options", List.of("Une croissant", "Un croissant", "Des croissant", "La croissant"), "correctAnswer", "Un croissant"), mapper));
+                    "HQ: Attention! Une policière vous arrête. Elle demande: 'Où allez-vous ?'.",
+                    "Răspunde 'Eu merg la gară'. Atenție la articol (à la gare).",
+                    Map.of("options", List.of("Je vais au gare.", "Je vas à la gare.", "Je vais à la gare.", "Je suis le gare."), "correctAnswer", "Je vais à la gare.", "imageUrl", imgGendarme), mapper));
 
-            tasks.add(createTask(bakeryLevel, 12, TaskType.MultipleChoice,
-                    "Baguette este feminin. Cum spui 'O baghetă'?",
-                    "Folosim 'Une' pentru feminin.",
-                    Map.of("options", List.of("Un baguette", "Le baguette", "Une baguette", "Lui baguette"), "correctAnswer", "Une baguette"), mapper));
+            tasks.add(createTask(bakeryLevel, 12, TaskType.VisualID,
+                    "Cliquez sur la policière (La Policière) pour présenter vos documents.",
+                    "Caută persoana în uniformă cu insignă (în partea stângă a străzii).",
+                    Map.of("targetZone", Map.of("x", 250, "y", 400, "width", 150, "height", 300), "imageUrl", imgGendarme), mapper));
 
-            tasks.add(createTask(bakeryLevel, 13, TaskType.DragAndDrop,
-                    "Pune cuvintele la locul lor: UN (Masculin) sau UNE (Feminin).",
-                    "Gâteau, Eclair și Sandwich sunt masculine (Un). Brioche și Galette sunt feminine (Une).",
+            tasks.add(createTask(bakeryLevel, 13, TaskType.SentenceBuilder,
+                    "Montrez vos documents: 'Voici mon passeport, madame.'",
+                    "Iată pașaportul meu, doamnă.",
+                    Map.of("words", List.of("Voici", "mon", "ma", "passeport,", "madame."),
+                            "correctOrder", List.of("Voici", "mon", "passeport,", "madame."), "imageUrl", imgGendarme), mapper));
+
+            tasks.add(createTask(bakeryLevel, 14, TaskType.DragAndDrop,
+                    "Mémorisez les directions: Classez les mots en 'Direction' et 'Position'.",
+                    "La dreapta și Tot înainte sunt direcții de mișcare. În spate / În față sunt poziții.",
                     Map.of("items", List.of(
-                            Map.of("id", "g1", "text", "Gâteau", "category", "un"),
-                            Map.of("id", "g2", "text", "Brioche", "category", "une"),
-                            Map.of("id", "g3", "text", "Sandwich", "category", "un"),
-                            Map.of("id", "g4", "text", "Galette", "category", "une"),
-                            Map.of("id", "g5", "text", "Eclair", "category", "un")
-                    ), "zones", List.of("un", "une")), mapper));
+                            Map.of("id", "i1", "text", "À droite", "category", "Direction"),
+                            Map.of("id", "i2", "text", "Derrière", "category", "Position"),
+                            Map.of("id", "i3", "text", "Tout droit", "category", "Direction"),
+                            Map.of("id", "i4", "text", "Devant", "category", "Position")
+                    ), "zones", List.of("Direction", "Position"), "imageUrl", imgGendarme), mapper));
 
 
-            tasks.add(createTask(bakeryLevel, 14, TaskType.MultipleChoice,
-                    "Vrei mai multe cornuri (plural). Ce cuvânt pui în față?",
-                    "Pentru plural folosim 'Des'.",
-                    Map.of("options", List.of("Un", "Une", "Des", "Le"), "correctAnswer", "Des"), mapper));
+            // ==========================================
+            // ZONA 3: LA GARE DU NORD (Gara)
+            // ==========================================
+            String imgGare = "/assets/bg_metro_station.jpg";
 
-            tasks.add(createTask(bakeryLevel, 15, TaskType.MultipleChoice,
-                    "Cum scriem corect la plural?",
-                    "Trebuie să aibă 's' la final.",
-                    Map.of("options", List.of("Des croissant", "Des croissants", "Des croissante", "Des croissanturi"), "correctAnswer", "Des croissants"), mapper));
+            tasks.add(createTask(bakeryLevel, 15, TaskType.VisualID,
+                    "HQ: Vous êtes à la gare. Cherchez l'horloge (L'horloge) pour l'heure de l'extraction.",
+                    "Caută ceasul mare și rotund din stația de tren.",
+                    Map.of("targetZone", Map.of("x", 400, "y", 150, "width", 100, "height", 100), "imageUrl", imgGare), mapper));
 
-            tasks.add(createTask(bakeryLevel, 16, TaskType.SentenceBuilder,
-                    "Spune 'Eu iau un croissant'. (Fără politețe complicată).",
-                    "Folosește verbul 'Je prends' (Eu iau).",
-
-                    Map.of("words", List.of("Je", "prends", "un", "croissant", "tu", "il"),
-                            "correctOrder", List.of("Je", "prends", "un", "croissant")), mapper));
+            tasks.add(createTask(bakeryLevel, 16, TaskType.MultipleChoice,
+                    "Quelle heure est-il si l'horloge montre 18:15 ?",
+                    "18 = dix-huit. 15 minute se spune 'et quart' (și un sfert).",
+                    Map.of("options", List.of("Dix-huit heures et demie", "Dix-neuf heures", "Dix-huit heures et quart", "Huit heures et quart"), "correctAnswer", "Dix-huit heures et quart", "imageUrl", imgGare), mapper));
 
             tasks.add(createTask(bakeryLevel, 17, TaskType.SentenceBuilder,
-                    "Ai cerut produsul. Ce spui la final ca să fii politicos?",
-                    "S'il vous plaît (Vă rog).",
-                    Map.of("words", List.of("s'il", "merci", "plaît", "vous", "te"),
-                            "correctOrder", List.of("s'il", "vous", "plaît")), mapper));
+                    "Achetez votre billet: 'Un billet pour Londres, s'il vous plaît'.",
+                    "Un bilet pentru Londra, vă rog.",
+                    Map.of("words", List.of("Un billet", "pour", "Londres,", "s'il vous", "plaît", "avec"),
+                            "correctOrder", List.of("Un billet", "pour", "Londres,", "s'il vous", "plaît"), "imageUrl", imgGare), mapper));
 
-            tasks.add(createTask(bakeryLevel, 18, TaskType.MultipleChoice,
-                    "Vânzătorul spune: 'Ça fait 2 Euros'. Cât costă?",
-                    "Deux = 2.",
-                    Map.of("options", List.of("1 Euro", "2 Euro", "5 Euro", "10 Euro"), "correctAnswer", "2 Euro"), mapper));
+            tasks.add(createTask(bakeryLevel, 18, TaskType.DragAndDrop,
+                    "Rapport de grammaire: Triez les verbes par Auxiliaire au Passé Composé (ÊTRE vs AVOIR).",
+                    "Verbele de mișcare (aller, partir) folosesc ÊTRE. Restul folosesc AVOIR.",
+                    Map.of("items", List.of(
+                            Map.of("id", "i1", "text", "Aller", "category", "ÊTRE"),
+                            Map.of("id", "i2", "text", "Manger", "category", "AVOIR"),
+                            Map.of("id", "i3", "text", "Partir", "category", "ÊTRE"),
+                            Map.of("id", "i4", "text", "Regarder", "category", "AVOIR")
+                    ), "zones", List.of("ÊTRE", "AVOIR"), "imageUrl", imgGare), mapper));
 
-            tasks.add(createTask(bakeryLevel, 19, TaskType.MultipleChoice,
-                    "Cumperi 2 baghete. Una costă 1 Euro. Cât fac 2 baghete?",
-                    "1 + 1 = 2 (Deux).",
-                    Map.of("options", List.of("Un Euro", "Deux Euros", "Trois Euros", "Mille Euros"), "correctAnswer", "Deux Euros"), mapper));
+
+            // ==========================================
+            // ZONA 4: LE MUSÉE DU LOUVRE (Muzeul)
+            // ==========================================
+            String imgLouvre = "/assets/bg_louvre_museum.jpg";
+
+            tasks.add(createTask(bakeryLevel, 19, TaskType.VisualID,
+                    "HQ: Dernière étape ! Cliquez sur le tableau de La Joconde (Mona Lisa) au musée.",
+                    "Privește pe peretele din dreapta, portretul clasic al femeii.",
+                    Map.of("targetZone", Map.of("x", 650, "y", 300, "width", 150, "height", 180), "imageUrl", imgLouvre), mapper));
 
             tasks.add(createTask(bakeryLevel, 20, TaskType.MultipleChoice,
-                    "Vrei să plătești cu cardul. Ce spui?",
-                    "Card = Carte.",
-                    Map.of("options", List.of("Cu bani.", "La carte, s'il vous plaît.", "Gratuit?", "Nu plătesc."), "correctAnswer", "La carte, s'il vous plaît."), mapper));
+                    "Le guide dit: 'C'est un ____ tableau'. Choisissez l'adjectif pour 'vechi'.",
+                    "Cuvântul 'tableau' este masculin, deci folosim 'vieux'.",
+                    Map.of("options", List.of("vieille", "vieux", "vieil", "ancien"), "correctAnswer", "vieux", "imageUrl", imgLouvre), mapper));
 
-            tasks.add(createTask(bakeryLevel, 21, TaskType.MultipleChoice,
-                    "Brutarul îți dă pâinea și spune 'Voilà!'. Ce îi răspunzi?",
-                    "Când primești ceva, spui Mulțumesc (Merci).",
-                    Map.of("options", List.of("Pardon.", "Merci!", "Nu vreau.", "Salut."), "correctAnswer", "Merci!"), mapper));
+            tasks.add(createTask(bakeryLevel, 21, TaskType.SentenceBuilder,
+                    "Envoyez le message final: 'J'ai trouvé le tableau'.",
+                    "Am găsit tabloul. (Passé Composé)",
+                    Map.of("words", List.of("J'ai", "trouvé", "trouve", "le", "tableau", "au"),
+                            "correctOrder", List.of("J'ai", "trouvé", "le", "tableau"), "imageUrl", imgLouvre), mapper));
 
-            tasks.add(createTask(bakeryLevel, 22, TaskType.SentenceBuilder,
-                    "Vrei să pleci. Formează propoziția de rămas bun.",
-                    "Au revoir (La revedere).",
-                    Map.of("words", List.of("Au", "revoir", "bonjour", "salut"),
-                            "correctOrder", List.of("Au", "revoir")), mapper));
-
-            tasks.add(createTask(bakeryLevel, 23, TaskType.MultipleChoice,
-                    "Este dimineață. Urează-i o zi bună.",
-                    "Bonne journée (Zi bună). Bonne soirée e pentru seară.",
-                    Map.of("options", List.of("Bonne nuit!", "Bonne journée!", "Pa!", "Merci!"), "correctAnswer", "Bonne journée!"), mapper));
-
-            tasks.add(createTask(bakeryLevel, 24, TaskType.DragAndDrop,
-                    "Ultimul test. Ce este mâncare și ce este politețe?",
-                    "Croissant e mâncare. Merci și Bonjour sunt politețe.",
-                    Map.of("items", List.of(
-                            Map.of("id", "r1", "text", "Croissant", "category", "mancare"),
-                            Map.of("id", "r2", "text", "Merci", "category", "politețe"),
-                            Map.of("id", "r3", "text", "Baguette", "category", "mancare"),
-                            Map.of("id", "r4", "text", "Bonjour", "category", "politețe")
-                    ), "zones", List.of("mancare", "politețe")), mapper));
-
-            tasks.add(createTask(bakeryLevel, 25, TaskType.MultipleChoice,
-                    "Ai reușit! Ai cumpărat pâinea. Ești fericit?",
-                    "Oui = Da.",
-                    Map.of("options", List.of("Non.", "Oui, très content!", "Nu știu.", "Poate."), "correctAnswer", "Oui, très content!"), mapper));
+            tasks.add(createTask(bakeryLevel, 22, TaskType.MultipleChoice,
+                    "HQ: 'Avez-vous fini la mission ?'. Répondez affirmativement avec le pronom direct (la mission).",
+                    "Înlocuim 'la mission' (feminin) cu 'la' (care devine l' în fața vocalei). Acordăm participiul cu 'e'.",
+                    Map.of("options", List.of("Oui, je l'ai finie.", "Oui, j'ai fini elle.", "Oui, je le finis.", "Oui, je la fini."), "correctAnswer", "Oui, je l'ai finie.", "imageUrl", imgLouvre), mapper));
 
             gameTaskRepository.saveAll(tasks);
             System.out.println("LOG: Scenariul a fost salvat cu succes (" + tasks.size() + " intrebari).");
         };
-
-
-
-
     }
 
-    private GameTask createTask(GameLevel level, int index, TaskType type, String req, String hint, Map<String, Object> data, ObjectMapper mapper)
-    {
+    private GameTask createTask(GameLevel level, int index, TaskType type, String req, String hint, Map<String, Object> data, ObjectMapper mapper) {
         try {
             return GameTask.builder()
                     .gameLevel(level)
@@ -217,7 +216,7 @@ public class BakeryLevelInitializer {
                     .aiHintContext(hint)
                     .taskData(mapper.writeValueAsString(data))
                     .build();
-        } catch (Exception e){
+        } catch (Exception e) {
             throw new RuntimeException("Eroare la generarea task-ului: " + e.getMessage());
         }
     }

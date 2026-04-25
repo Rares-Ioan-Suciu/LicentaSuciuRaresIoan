@@ -4,6 +4,7 @@ import AlgorithmAdventure from '../game/AlgorithmAdventure';
 import { TeacherService } from '../../services/TeacherService';
 import LiveMonitorGrid from './LiveMonitorGrid';
 import { gtStyles as s } from './TabStyle/GameTabStyles';
+import { BotSimulator } from './BotSimulator';
 
 interface GameTabProps { isTeacher: boolean; }
 
@@ -29,6 +30,35 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
 
     const [activeSession, setActiveSession] = useState<SessionData | null>(null);
     const [activePin, setActivePin] = useState<string | null>(null);
+
+    useEffect(() => {
+        const savedMagicCode = localStorage.getItem('magic_join_code');
+
+        if (savedMagicCode && !isTeacher) {
+            setStudentCode(savedMagicCode.toUpperCase());
+            localStorage.removeItem('magic_join_code');
+        }
+    }, [isTeacher]);
+
+    useEffect(() => {
+        try {
+            const token = localStorage.getItem('token');
+            if (token && !isTeacher) {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const payload = JSON.parse(jsonPayload);
+                if (payload.full_name) {
+                    setStudentName(payload.full_name);
+                }
+            }
+        } catch (e) {
+            console.log("Nu am putut extrage numele din token", e);
+        }
+    }, [isTeacher]);
 
     useEffect(() => {
         const savedSession = localStorage.getItem('robot_session_info');
@@ -85,9 +115,13 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
 
                 if (isTeacher) {
                     if (msg.type === "STUDENT_JOINED" || msg.type === "STUDENT_UPDATE" || msg.type === "STUDENT_NEEDS_HELP") {
-                        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-                        audio.play().catch(err => console.warn("Sunetul a fost blocat de browser:", err));
-                        
+
+                        if (msg.type === "STUDENT_NEEDS_HELP" || (msg.type === "STUDENT_UPDATE" && msg.data.helpStatus === 'PENDING')) {
+                            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+                            audio.volume = 0.5;
+                            audio.play().catch(err => console.warn("Sunetul a fost blocat de browser:", err));
+                        }
+
                         setStudents(prev => ({
                             ...prev,
                             [msg.data.studentName]: { ...prev[msg.data.studentName], ...msg.data }
@@ -174,19 +208,16 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
         }
     };
 
-    // --- LOGICA NOUĂ PENTRU DEPLASAREA ROBOTULUI ---
     const handleActionDelegate = (studentName: string, type: string) => {
-
         if (type === 'ROBOT_DELEGATE') {
             setStudents(prev => ({
                 ...prev,
                 [studentName]: { ...prev[studentName], robotOnTheWay: true }
             }));
 
-            
             if (socket?.readyState === WebSocket.OPEN && sessionInfo) {
                 socket.send(JSON.stringify({
-                    type: "ROBOT_DISPATCH", 
+                    type: "ROBOT_DISPATCH",
                     accessCode: "GLOBAL",
                     studentData: {
                         studentName: studentName,
@@ -200,7 +231,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
             return;
         }
 
-        // Dacă profesorul se răzgândește pe drum
         if (type === 'CANCEL_ROBOT') {
             setStudents(prev => ({
                 ...prev,
@@ -209,9 +239,7 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
             return;
         }
 
-        // PASUL 2: A ajuns! Generăm sfatul.
         if (type === 'AI_DELEGATE') {
-            // Curățăm starea de deplasare
             setStudents(prev => ({
                 ...prev,
                 [studentName]: { ...prev[studentName], robotOnTheWay: false }
@@ -273,10 +301,28 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
     };
 
     if (isTeacher) {
-        const studentList = Object.values(students);
-        const activeCount = studentList.length;
-        const helpCount = studentList.filter(s => s.needsHelp || s.helpStatus === 'PENDING').length;
-        const avgScore = activeCount > 0 ? Math.round(studentList.reduce((acc, s) => acc + s.score, 0) / activeCount) : 0;
+        // --- NOU: ALGORITMUL DE TRIAGE (SORTARE INTELIGENTĂ) ---
+        const sortedStudents = Object.values(students).sort((a: any, b: any) => {
+            const aNeedsHelp = a.needsHelp || a.helpStatus === 'PENDING';
+            const bNeedsHelp = b.needsHelp || b.helpStatus === 'PENDING';
+
+            // 1. Prioritate maximă: Cine a cerut ajutor manual
+            if (aNeedsHelp && !bNeedsHelp) return -1;
+            if (!aNeedsHelp && bNeedsHelp) return 1;
+
+            // 2. Prioritate medie: Sortare descrescătoare după numărul de greșeli
+            const aErrors = a.errorCount || 0;
+            const bErrors = b.errorCount || 0;
+            if (aErrors !== bErrors) {
+                return bErrors - aErrors;
+            }
+
+            // 3. Prioritate mică: Ordine alfabetică
+            return (a.studentName || "").localeCompare(b.studentName || "");
+        });
+
+        const activeCount = sortedStudents.length;
+        const helpCount = sortedStudents.filter((s: any) => s.needsHelp || s.helpStatus === 'PENDING').length;
 
         return (
             <div style={s.wrapper}>
@@ -313,6 +359,26 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                     <div style={s.centerCard}>
                         <h4 style={{ color: '#94a3b8', letterSpacing: '3px', fontWeight: 800 }}>Cod de Acces</h4>
                         <h1 style={s.accessCodeDisplay}>{sessionInfo.accessCode}</h1>
+
+                        <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                            <input
+                                readOnly
+                                aria-label="Link magic pentru conectare elevi"
+                                title="Link conectare"
+                                value={`${window.location.origin}/login?join=${sessionInfo.accessCode}`}
+                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '300px', backgroundColor: '#f8fafc', color: '#64748b' }}
+                            />
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/login?join=${sessionInfo.accessCode}`);
+                                    alert("Link-ul a fost copiat! Trimite-l elevilor.");
+                                }}
+                                style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                            >
+                                📋 Copiază Link
+                            </button>
+                        </div>
+
                         <button onClick={() => setGameState('running')} style={{ ...s.primaryBtn, background: '#10b981' }}>Start Joc</button>
                     </div>
                 )}
@@ -332,7 +398,11 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                             </button>
                             <button onClick={handleTerminate} style={{ ...s.pinBtn, background: '#ef4444', color: 'white', marginLeft: 'auto' }}>Stop Joc</button>
                         </div>
-                        <LiveMonitorGrid students={studentList} accessCode={sessionInfo.accessCode} onAction={handleActionDelegate} />
+
+                        {/* Trimitem lista SORTATĂ către Grilă */}
+                        <LiveMonitorGrid students={sortedStudents} accessCode={sessionInfo.accessCode} onAction={handleActionDelegate} />
+
+                        <BotSimulator accessCode={sessionInfo.accessCode} sessionId={sessionInfo.id} />
                     </div>
                 )}
             </div>
@@ -343,10 +413,38 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
         <div style={s.wrapper}>
             {!activeSession ? (
                 <div style={s.centerCard}>
-                    <h2 style={{ fontWeight: 900, marginBottom: '30px' }}>Conectare la Joc</h2>
-                    <input style={s.bigInput} value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Numele tău" />
-                    <input style={{ ...s.bigInput, textAlign: 'center', fontWeight: '900', letterSpacing: '6px' }} value={studentCode} onChange={(e) => setStudentCode(e.target.value.toUpperCase())} placeholder="Cod" />
-                    <button onClick={handleJoinGame} style={{ ...s.primaryBtn, marginTop: '30px' }}>Intră în joc</button>
+                    <h2 style={{ fontWeight: 900, marginBottom: '20px' }}>Conectare la Joc</h2>
+
+                    {studentCode && new URLSearchParams(window.location.search).get('join') ? (
+                        <div style={{ padding: '12px', background: '#ecfdf5', color: '#059669', borderRadius: '8px', marginBottom: '20px', fontWeight: 'bold', fontSize: '18px' }}>
+                            Cod sesiune: {studentCode}
+                        </div>
+                    ) : (
+                        <input
+                            aria-label="Cod sesiune"
+                            title="Cod sesiune"
+                            style={{ ...s.bigInput, textAlign: 'center', fontWeight: '900', letterSpacing: '6px', marginBottom: '15px' }}
+                            value={studentCode}
+                            onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
+                            placeholder="Cod Sesiune"
+                        />
+                    )}
+                    {studentName ? (
+                        <div style={{ fontSize: '18px', color: '#475569', marginBottom: '25px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            Conectat ca: <strong>{studentName}</strong>
+                        </div>
+                    ) : (
+                        <input
+                            style={s.bigInput}
+                            value={studentName}
+                            onChange={(e) => setStudentName(e.target.value)}
+                            placeholder="Numele tău"
+                        />
+                    )}
+
+                    <button onClick={handleJoinGame} style={{ ...s.primaryBtn, marginTop: '10px', fontSize: '20px', padding: '15px' }}>
+                        🚀 Intră în Sesiune
+                    </button>
                 </div>
             ) : (
                 <div style={{ width: '100%' }}>
