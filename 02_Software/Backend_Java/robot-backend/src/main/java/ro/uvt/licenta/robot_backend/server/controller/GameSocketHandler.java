@@ -22,12 +22,13 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final GameSessionService gameSessionService;
     private final OpenAIService openAIService;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String ESP32_IP = "192.168.1.140"; // Asigură-te că IP-ul ESP32 este corect aici!
+    private final String ESP32_IP = "192.168.1.140";
 
     private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
 
     private volatile String stationedStudent = null;
     private volatile String stationedAccessCode = null;
+    private volatile String stationedLanguage = "ro"; // Salvăm limba elevului la care a fost trimis robotul
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
@@ -35,7 +36,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
         JsonNode json = objectMapper.readTree(message.getPayload());
         String type = json.get("type").asText();
 
-        // Robotul folosește "GLOBAL", elevii folosesc codul sesiunii
         String accessCode = json.path("accessCode").asText("GLOBAL");
 
         switch (type) {
@@ -60,6 +60,13 @@ public class GameSocketHandler extends TextWebSocketHandler {
             case "TEACHER_REPLY":
                 handleTeacherReply(json, accessCode);
                 break;
+            case "SHOW_EXTRACTION_CODE":
+                // Rutează comanda de puzzle fizic de la profesor direct către robot
+                sendToUser("GLOBAL", "robot", Map.of(
+                        "type", "SHOW_EXTRACTION_CODE",
+                        "code", json.path("code").asText("0000")
+                ));
+                break;
             case "ROBOT_SPEAK":
                 sendToUser("GLOBAL", "robot", Map.of(
                         "type", "VOICE_HINT",
@@ -68,25 +75,31 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 ));
                 break;
             case "ROBOT_DISPATCH":
-                // Profesorul trimite robotul. Noi trimitem datele către Fața Robotului
                 sendToUser("GLOBAL", "robot", Map.of(
                         "type", "ROBOT_DISPATCHED",
                         "studentData", json.get("studentData")
                 ));
                 break;
             case "ROBOT_ENGAGED":
-                // Elevul a apăsat butonul verde pe robot. Robotul devine Tutor Oficial!
                 stationedStudent = json.has("studentName") ? json.get("studentName").asText() : json.get("username").asText();
                 stationedAccessCode = accessCode;
 
-                // Generăm automat PRIMUL indiciu de la AI
                 handleAiDelegation(json, accessCode);
                 break;
         }
     }
 
+    // Funcție mică pentru a detecta materia pe baza textului din task
+    private String detectLanguage(String text) {
+        String lower = text.toLowerCase();
+        if (lower.contains("francez") || lower.contains("tradu") || lower.contains("louvre")
+                || lower.contains("croissant") || lower.contains("bonjour") || lower.contains("passé")) {
+            return "fr";
+        }
+        return "ro";
+    }
+
     private void handleAiDelegation(JsonNode json, String code) throws Exception {
-        // Suportăm ambele denumiri pentru flexibilitate (din React vin diferit uneori)
         String studentName = json.has("studentName") ? json.path("studentName").asText("Elev") : json.path("username").asText("Elev");
         String taskRequirement = json.path("task").asText("Nespecificată");
         Long sessionId = json.path("sessionId").asLong();
@@ -113,7 +126,15 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 taskRequirement, question, correctAnswer, studentAnswer, extraContext
         );
 
-        String hint = openAIService.generateAIHint(fullContext, taskRequirement, history);
+        // Detectăm limba și o salvăm pentru sesiunea robotului cu acest elev
+        String limba = detectLanguage(fullContext);
+        if (studentName.equals(stationedStudent)) {
+            stationedLanguage = limba;
+        }
+
+        // Generăm hint-ul trimițând și parametrul de limbă ('fr' sau 'ro') către AI
+        String hint = openAIService.generateAIHint(fullContext, taskRequirement, history, limba);
+
         gameSessionService.addAiHintToHistory(code, studentName, hint);
 
         notifyTeacher(code, "AI_HINT_GENERATED", Map.of(
@@ -128,11 +149,11 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 "message", "Beatrix: " + hint
         ));
 
-        // Trimitem feedback-ul VOCAL către Fața Robotului
+        // Trimitem feedback-ul VOCAL către Fața Robotului cu setarea de limbă corectă
         sendToUser("GLOBAL", "robot", Map.of(
                 "type", "VOICE_HINT",
                 "message", hint,
-                "lang", "ro-RO"
+                "lang", limba.equals("fr") ? "fr-FR" : "ro-RO"
         ));
     }
 
@@ -152,13 +173,18 @@ public class GameSocketHandler extends TextWebSocketHandler {
         if (studentName.equals(stationedStudent) && code.equals(stationedAccessCode)) {
             System.out.println("[ROBOT] Elevul mentorat a greșit! Cer un nou sfat AI.");
 
-            // 1. Dăm comanda de Emote 2 (Supărare/Negare) către ESP32 și un mic oftat vocal
             triggerESP32Emote(2); // Declanșează eșec pe mașinuță
+
+            // Reacționează în limba potrivită materiei
+            String oopsMessage = stationedLanguage.equals("fr")
+                    ? "Oh non, ce n'est pas ça ! Laisse-moi chercher un autre indice..."
+                    : "Of, nu e chiar așa! Lasă-mă să mă gândesc la alt indiciu...";
+            String langCode = stationedLanguage.equals("fr") ? "fr-FR" : "ro-RO";
 
             sendToUser("GLOBAL", "robot", Map.of(
                     "type", "VOICE_HINT",
-                    "message", "Of, nu e chiar așa! Lasă-mă să mă gândesc la alt indiciu...",
-                    "lang", "ro-RO"
+                    "message", oopsMessage,
+                    "lang", langCode
             ));
 
             handleAiDelegation(json, code);
@@ -179,15 +205,21 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
             triggerESP32Emote(1); // Declanșează victorie pe mașinuță
 
-            // 2. Fața de pe telefon felicită copilul
+            // Felicită elevul în limba potrivită materiei
+            String bravoMessage = stationedLanguage.equals("fr")
+                    ? "Excellent ! Réponse parfaite ! Mission accomplie, je rentre à la base."
+                    : "Excelent! Răspuns perfect! Misiune îndeplinită, mă întorc la bază.";
+            String langCode = stationedLanguage.equals("fr") ? "fr-FR" : "ro-RO";
+
             sendToUser("GLOBAL", "robot", Map.of(
                     "type", "VOICE_HINT",
-                    "message", "Excelent! Răspuns perfect! Misiune îndeplinită, mă întorc la bază.",
-                    "lang", "ro-RO"
+                    "message", bravoMessage,
+                    "lang", langCode
             ));
 
             stationedStudent = null;
             stationedAccessCode = null;
+            stationedLanguage = "ro"; // reset
         }
     }
 
@@ -289,19 +321,16 @@ public class GameSocketHandler extends TextWebSocketHandler {
     }
 
     private void triggerESP32Emote(int emoteId) {
-        // Un thread nou funcționează exact ca un Promise în Javascript (asincron)
         new Thread(() -> {
             try {
                 String url = "http://" + ESP32_IP + "/emote?id=" + emoteId;
                 System.out.println("[ESP32 FETCH] Trimit comanda către: " + url);
 
-                // Echivalentul lui fetch() în Spring Boot
                 org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
                 String response = restTemplate.getForObject(url, String.class);
 
                 System.out.println("[ESP32 SUCCESS] Robotul a dansat! Răspuns: " + response);
             } catch (Exception e) {
-                // Echivalentul lui .catch() din React
                 System.err.println("[ESP32 ERROR] Nu am putut mișca robotul: " + e.getMessage());
             }
         }).start();

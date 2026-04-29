@@ -11,4 +11,6 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
     List<StudentProgress> findAllBySession(GameSession session);
     Optional<StudentProgress> findBySession_AccessCodeAndStudentName(String accessCode, String studentName);
     Optional<StudentProgress> findBySessionAndStudentName(GameSession session, String studentName);
+
+    List<StudentProgress> findBySessionId(Long sessionId);
 }

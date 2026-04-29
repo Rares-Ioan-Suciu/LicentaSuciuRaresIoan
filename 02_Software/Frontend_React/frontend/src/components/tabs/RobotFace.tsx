@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+
 const ESP32_IP = "192.168.1.140";
 
 interface StudentData {
@@ -21,6 +22,9 @@ export const RobotFace: React.FC = () => {
     const [isDispatched, setIsDispatched] = useState(false);
     const [targetStudent, setTargetStudent] = useState<StudentData | null>(null);
 
+    // Stare nouă pentru Puzzle-ul Fizic (Escape Room)
+    const [secretCode, setSecretCode] = useState<string | null>(null);
+
     const wsRef = useRef<WebSocket | null>(null);
     const [isBlinking, setIsBlinking] = useState(false);
 
@@ -36,6 +40,7 @@ export const RobotFace: React.FC = () => {
         }
     };
 
+    // Funcția actualizată pentru a suporta accente native (ex: Franceză reală)
     const speak = (text: string, lang: string = 'ro-RO', targetEmotion: EmotionState = 'neutral'): Promise<void> => {
         return new Promise((resolve) => {
             if (!window.speechSynthesis) {
@@ -47,6 +52,17 @@ export const RobotFace: React.FC = () => {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
 
+            // Căutăm vocea corectă în sistemul de operare
+            const voices = window.speechSynthesis.getVoices();
+            if (lang === 'fr-FR') {
+                const frenchVoice = voices.find(voice => voice.lang.includes('fr-FR') || voice.lang === 'fr_FR');
+                if (frenchVoice) utterance.voice = frenchVoice;
+                utterance.rate = 0.9; // O idee mai rar pentru claritate
+            } else {
+                const romanianVoice = voices.find(voice => voice.lang.includes('ro-RO') || voice.lang === 'ro_RO');
+                if (romanianVoice) utterance.voice = romanianVoice;
+            }
+
             // Ajustăm tonul în funcție de emoție
             if (targetEmotion === 'happy') utterance.pitch = 1.3;
             else if (targetEmotion === 'sad') utterance.pitch = 0.8;
@@ -54,12 +70,12 @@ export const RobotFace: React.FC = () => {
 
             utterance.onstart = () => {
                 setIsSpeaking(true);
-                setEmotion(targetEmotion); // Setăm emoția în timpul vorbirii
+                setEmotion(targetEmotion);
             };
 
             utterance.onend = () => {
                 setIsSpeaking(false);
-                setEmotion('neutral'); // Revine la normal după ce tace
+                setEmotion('neutral');
                 resolve();
             };
 
@@ -76,12 +92,14 @@ export const RobotFace: React.FC = () => {
     const wakeUpRobot = async () => {
         setIsAwake(true);
         requestWakeLock();
+        // Preîncărcăm vocile (unele browsere au nevoie de acest trigger)
+        window.speechSynthesis.getVoices();
         await speak("Sistem online.", 'ro-RO', 'happy');
         connectWebSocket();
     };
 
     const connectWebSocket = () => {
-        const wsUrl = `ws://192.168.1.131:8080/ws_game`;
+        const wsUrl = `ws://10.113.105.1:8080/ws_game`; // ATENȚIE: Să te asiguri că e IP-ul tău corect!
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -94,15 +112,33 @@ export const RobotFace: React.FC = () => {
                 const data = JSON.parse(event.data);
 
                 if (data.type === 'VOICE_HINT' && data.message) {
-                    setMessage(data.message);
-
-                    // Deduce emoția din text (logică simplă pt licență)
                     let textEmotion: EmotionState = 'neutral';
                     const textLower = data.message.toLowerCase();
-                    if (textLower.includes('excelent') || textLower.includes('perfect') || textLower.includes('bravo')) textEmotion = 'happy';
-                    if (textLower.includes('of') || textLower.includes('greșit') || textLower.includes('nu e chiar')) textEmotion = 'sad';
+                    // Am adăugat și cuvinte cheie din franceză pentru a deduce emoția
+                    if (textLower.includes('excelent') || textLower.includes('perfect') || textLower.includes('bravo') || textLower.includes('excellent')) textEmotion = 'happy';
+                    if (textLower.includes('of') || textLower.includes('greșit') || textLower.includes('nu e chiar') || textLower.includes('non')) textEmotion = 'sad';
 
-                    await speak(data.message, data.lang || 'ro-RO', textEmotion);
+                    // LOGICĂ NOUĂ: Detectăm dacă mesajul este BILINGV (conține '|')
+                    if (data.message.includes('|')) {
+                        const parts = data.message.split('|');
+                        const frenchPart = parts[0].trim();
+                        const romanianPart = parts[1].trim();
+
+                        // 1. Vorbește în Franceză
+                        setMessage(frenchPart);
+                        await speak(frenchPart, 'fr-FR', textEmotion);
+
+                        // Pauză scurtă între limbi
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // 2. Vorbește în Română
+                        setMessage(romanianPart);
+                        await speak(romanianPart, 'ro-RO', textEmotion);
+                    } else {
+                        // Mesaj normal (o singură limbă, de ex. la Informatică)
+                        setMessage(data.message);
+                        await speak(data.message, data.lang || 'ro-RO', textEmotion);
+                    }
                 }
 
                 if (data.type === 'ROBOT_DISPATCHED' && data.studentData) {
@@ -114,14 +150,26 @@ export const RobotFace: React.FC = () => {
                     await speak(text, 'ro-RO', 'alert');
                 }
 
+                // EVENIMENT NOU: Puzzle-ul Fizic / Extracția
+                if (data.type === 'SHOW_EXTRACTION_CODE' && data.code) {
+                    setSecretCode(data.code);
+                    setEmotion('alert');
+                    const textToSpeak = `Attention! Le code secret est ${data.code.split('').join(', ')}`;
+                    setMessage("Cod de extracție activat!");
+
+                    await speak(textToSpeak, 'fr-FR', 'alert');
+
+                    // Ascundem codul automat după 60 de secunde
+                    setTimeout(() => setSecretCode(null), 60000);
+                }
+
                 if (data.type === 'ROBOT_EMOTE') {
                     fetch(`http://${ESP32_IP}/emote?id=${data.emoteId}`)
                         .catch(e => console.warn("Eroare ESP32:", e));
 
                     if (data.message) {
                         setMessage(data.message);
-                        // Dacă ID 1 = Victorie (happy), ID 2 = Eșec (sad)
-                        await speak(data.message, 'ro-RO', data.emoteId === 1 ? 'happy' : 'sad');
+                        await speak(data.message, data.lang || 'ro-RO', data.emoteId === 1 ? 'happy' : 'sad');
                     }
                 }
 
@@ -142,8 +190,6 @@ export const RobotFace: React.FC = () => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && targetStudent) {
             setIsDispatched(false);
             setMessage("Procesez datele...");
-
-            // Setăm fața "Gânditoare" cât timp așteaptă răspunsul de la AI
             setEmotion('thinking');
 
             wsRef.current.send(JSON.stringify({
@@ -170,19 +216,20 @@ export const RobotFace: React.FC = () => {
         const blinkLogic = () => {
             const randomTime = Math.random() * (5000 - 2000) + 2000;
             setTimeout(() => {
-                if (emotion === 'neutral' || emotion === 'happy') { // Nu clipește când gândește sau e alert
+                // Nu clipește când gândește, e alert, sau arată codul secret
+                if ((emotion === 'neutral' || emotion === 'happy') && !secretCode) {
                     setIsBlinking(true);
                     setTimeout(() => {
                         setIsBlinking(false);
                         blinkLogic();
                     }, 150);
                 } else {
-                    blinkLogic(); // Mai încearcă mai târziu
+                    blinkLogic();
                 }
             }, randomTime);
         };
         blinkLogic();
-    }, [emotion]);
+    }, [emotion, secretCode]);
 
     if (!isAwake) {
         return (
@@ -194,7 +241,6 @@ export const RobotFace: React.FC = () => {
         );
     }
 
-    // Funcție pentru a returna stilul ochilor în funcție de Emoție
     const getEyeStyle = () => {
         let baseStyle = { ...styles.eye };
 
@@ -204,13 +250,13 @@ export const RobotFace: React.FC = () => {
         }
 
         switch (emotion) {
-            case 'happy': // Ochii se curbează în sus (tipic anime ^ ^)
+            case 'happy':
                 return { ...baseStyle, borderRadius: '50% 50% 10px 10px', height: '60px', marginTop: '20px' };
-            case 'sad': // Ochii se lasă în jos
+            case 'sad':
                 return { ...baseStyle, borderRadius: '10px 10px 50% 50%', height: '60px', marginTop: '20px', backgroundColor: '#3b82f6', boxShadow: '0 0 30px #3b82f6' };
-            case 'alert': // Ochi mari, galbeni
+            case 'alert':
                 return { ...baseStyle, transform: 'scale(1.2)', backgroundColor: '#facc15', boxShadow: '0 0 40px #facc15' };
-            case 'thinking': // Ochii devin mici ca niște puncte
+            case 'thinking':
                 return { ...baseStyle, width: '20px', height: '20px', marginTop: '30px', animation: 'thinkBounce 1s infinite alternate' };
             default:
                 return baseStyle;
@@ -219,7 +265,13 @@ export const RobotFace: React.FC = () => {
 
     return (
         <div style={styles.container}>
-            {/* INJECTĂM ANIMAȚII CSS GLOBALE PENTRU OCHI */}
+            <button
+                onClick={() => speak("Bonjour, agent! Le code secret est 7, 3, 9, 2", 'fr-FR', 'happy')}
+                style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 1000, padding: '10px', backgroundColor: '#3b82f6', color: 'white' }}
+            >
+                🇫🇷 Testează Vocea Franceză
+            </button>
+
             <style>
                 {`
                 @keyframes thinkBounce {
@@ -229,7 +281,13 @@ export const RobotFace: React.FC = () => {
                 `}
             </style>
 
-            {isDispatched && targetStudent ? (
+            {secretCode && (
+                <div style={styles.secretCodeOverlay}>
+                    {secretCode}
+                </div>
+            )}
+
+            {isDispatched && targetStudent && !secretCode ? (
                 <div style={styles.dispatchOverlay}>
                     <h2 style={styles.dispatchText}>Salut, {targetStudent.studentName}!</h2>
                     <p style={styles.dispatchSubtext}>Sunt aici să te ajut.</p>
@@ -239,13 +297,12 @@ export const RobotFace: React.FC = () => {
                 </div>
             ) : (
                 <>
-                    <div style={styles.eyesContainer}>
+                    <div style={{ ...styles.eyesContainer, opacity: secretCode ? 0.1 : 1 }}>
                         <div style={getEyeStyle()}></div>
                         <div style={getEyeStyle()}></div>
                     </div>
 
-                    {/* GURA (Dispare când e trist sau gândește) */}
-                    {emotion !== 'thinking' && emotion !== 'sad' && (
+                    {emotion !== 'thinking' && emotion !== 'sad' && !secretCode && (
                         <div style={{ ...styles.mouth, ...(isSpeaking ? styles.mouthSpeaking : {}) }}></div>
                     )}
 
@@ -258,7 +315,7 @@ export const RobotFace: React.FC = () => {
 
 const styles: { [key: string]: React.CSSProperties } = {
     container: {
-        backgroundColor: '#020617', // Negru mai profund pentru contrast pe AMOLED
+        backgroundColor: '#020617',
         height: '100dvh',
         width: '100vw',
         display: 'flex',
@@ -274,7 +331,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         padding: '20px 40px',
         fontSize: '18px',
         fontWeight: 'bold',
-        backgroundColor: '#22d3ee', // Cyan tech
+        backgroundColor: '#22d3ee',
         color: '#000',
         border: 'none',
         borderRadius: '10px',
@@ -285,15 +342,16 @@ const styles: { [key: string]: React.CSSProperties } = {
     eyesContainer: {
         display: 'flex',
         gap: '60px',
-        marginBottom: '40px'
+        marginBottom: '40px',
+        transition: 'opacity 0.3s ease-in-out'
     },
     eye: {
         width: '80px',
         height: '80px',
-        backgroundColor: '#22d3ee', // Trecere la Cyan pentru vibe tech
+        backgroundColor: '#22d3ee',
         borderRadius: '50%',
         boxShadow: '0 0 40px #22d3ee',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' // Tranziție mai smooth a formelor
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
     },
     eyeSpeaking: {
         transform: 'scale(1.1)',
@@ -324,7 +382,6 @@ const styles: { [key: string]: React.CSSProperties } = {
         width: '90%',
         opacity: 0.5
     },
-
     dispatchOverlay: {
         display: 'flex',
         flexDirection: 'column',
@@ -362,5 +419,22 @@ const styles: { [key: string]: React.CSSProperties } = {
         cursor: 'pointer',
         transition: 'transform 0.1s',
         textTransform: 'uppercase'
+    },
+    secretCodeOverlay: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        color: '#10b981',
+        fontSize: '6rem',
+        fontWeight: '900',
+        fontFamily: 'monospace',
+        textShadow: '0 0 30px #10b981, 0 0 10px #fff',
+        zIndex: 100,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        padding: '30px 50px',
+        borderRadius: '20px',
+        border: '4px solid #10b981',
+        letterSpacing: '15px'
     }
 };

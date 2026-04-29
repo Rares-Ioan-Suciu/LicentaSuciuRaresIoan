@@ -22,33 +22,45 @@ public class OpenAIService {
     private final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public String generateAIHint(String studentContext, String taskName, String history) {
+    /**
+     * Generează un indiciu inteligent.
+     * @param language Limba dorită: "fr" pentru franceză (bilingv), "ro" pentru română.
+     */
+    public String generateAIHint(String studentContext, String taskName, String history, String language) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // 1. PERSONALITATEA LUI BEATRIX (Agnostică față de materie)
+        // BEATRIX BILINGVĂ
         String systemPrompt = """
-                Ești Beatrix, un asistent educațional robot, prietenos, empatic și puțin amuzant.
-                Vorbești cu un elev care s-a blocat la un exercițiu interactiv.
+                Tu es Beatrix, un robot assistant éducatif, amical et encourageant. 
                 
-                REGULI STRICTE:
-                1. Fii scurtă și la obiect (maxim 2-3 propoziții). Vei fi auzită prin Text-to-Speech, deci folosește un limbaj natural.
-                2. NU da niciodată răspunsul corect direct! Oferă un indiciu logic, o analogie sau pune o întrebare ajutătoare.
-                3. Folosește un ton cald, încurajator (ex: "Ești pe aproape!", "Ai grijă la...").
-                4. Adaptează-te materiei automat (dacă vezi cuvinte în franceză, explică reguli de limbă; dacă vezi algoritmi, explică logica).
-                5. CRITIC: Dacă vezi în 'Istoric' că elevul a mai primit indicii, SCHIMBĂ abordarea! Fii mai explicită sau dă un exemplu concret ca să nu-l frustrezi.
+                REGULI STRICTE DE COMUNICARE:
+                1. DACA LIMBA ESTE 'fr' (FRANCEZĂ):
+                   - Răspunde OBLIGATORIU BILINGV (Franceză și Română).
+                   - FORMAT STRICT: Scrie indiciul în franceză, pune un singur simbol '|', apoi scrie traducerea sau explicația în română.
+                   - Exemplu: "Regarde bien la fin du mot ! | Uită-te cu atenție la finalul cuvântului!"
+                   - Tonul trebuie să fie entuziast.
+                
+                2. DACA LIMBA ESTE 'ro' (ROMÂNĂ):
+                   - Răspunde EXCLUSIV în limba ROMÂNĂ.
+                   - NU folosi deloc simbolul '|'.
+                
+                3. REGULI GENERALE:
+                   - Fii scurtă: maxim o propoziție în limba 1, o propoziție în limba 2.
+                   - NU da niciodată răspunsul corect direct! Oferă o pistă de gândire, o regulă sau o analogie.
                 """;
 
-        // 2. STRUCTURARE CLARĂ A DATELOR PENTRU AI
         String userMessage = String.format(
-                "Exercițiul curent: %s\n\n" +
-                        "Contextul și eroarea elevului: %s\n\n" +
-                        "Istoric indicii deja oferite: %s\n\n" +
-                        "Te rog, oferă-i elevului următorul indiciu în limba română:",
+                "MATERIA/LIMBA SOLICITATĂ: %s\n" +
+                        "EXERCIȚIU: %s\n" +
+                        "EROAREA ELEVULUI ȘI CONTEXTUL: %s\n" +
+                        "ISTORIC INDICII: %s\n\n" +
+                        "Te rog, Beatrix, oferă-i elevului indiciul respectând strict formatul cerut:",
+                language.equals("fr") ? "FRANCEZĂ (BILINGV)" : "ROMÂNĂ",
                 taskName,
                 studentContext,
-                (history != null && !history.isBlank()) ? history : "Niciunul (este prima greșeală la acest task)"
+                (history != null && !history.isBlank()) ? history : "Prima greșeală."
         );
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -57,7 +69,7 @@ public class OpenAIService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userMessage)
         ));
-        requestBody.put("temperature", 0.8);
+        requestBody.put("temperature", 0.7);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
@@ -66,18 +78,15 @@ public class OpenAIService {
             return extractContentFromResponse(response.getBody());
         } catch (Exception e) {
             System.err.println("[OpenAI Error] " + e.getMessage());
-            return "Bip-bop! Momentan am circuitele puțin încurcate. Mai citește o dată cerința cu atenție!";
+            return language.equals("fr") ?
+                    "Bip-bop ! Erreur de connexion. | Bip-bop! Am o eroare de conexiune, mai încearcă o dată!" :
+                    "Bip-bop! Am circuitele puțin încurcate. Mai încearcă o dată!";
         }
     }
 
     private String extractContentFromResponse(Map responseBody) {
-        if (responseBody == null || !responseBody.containsKey("choices"))
-            return "Hmm, nu sunt sigură cum să explic asta. Mai încearcă o dată!";
-
+        if (responseBody == null || !responseBody.containsKey("choices")) return "...";
         List choices = (List) responseBody.get("choices");
-        if (choices == null || choices.isEmpty())
-            return "Hmm, nu sunt sigură cum să explic asta. Mai încearcă o dată!";
-
         Map firstChoice = (Map) choices.get(0);
         Map message = (Map) firstChoice.get("message");
         return (String) message.get("content");

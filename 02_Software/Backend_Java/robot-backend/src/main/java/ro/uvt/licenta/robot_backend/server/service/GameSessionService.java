@@ -96,52 +96,34 @@ public class GameSessionService {
 
     @Transactional(readOnly = true)
     public String generateSessionReportCsv(Long sessionId) {
-        GameSession session = gameSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Sesiunea nu a fost găsită"));
-
-        List<StudentProgress> results = studentProgressRepository.findAllBySession(session);
-
-        String levelTitle = session.getGameLevel().getTitle().toLowerCase();
-        int totalTasks = (levelTitle.contains("info") || levelTitle.contains("grafuri")) ? 24 : 25;
-
+        List<StudentProgress> students = studentProgressRepository.findBySessionId(sessionId);
         StringBuilder csv = new StringBuilder();
-        csv.append("Nume Elev,Progres (%),Status,Greseli Totale,Interventii AI,Acuratete (%),Ultima Eroare Inregistrata\n");
+        csv.append('\ufeff');
 
-        for (StudentProgress p : results) {
-            int currentTask = p.getCurrentTaskIndex();
-            int progressPercent = (int) Math.round((double) currentTask / totalTasks * 100);
+        csv.append("Nume Elev,Scor Final,Task-uri Finalizate,Număr Erori,Cereri Ajutor Robot\n");
 
-            if (progressPercent > 100) progressPercent = 100;
-            String status = (currentTask >= totalTasks - 1) ? "Finalizat" : "In lucru";
-            int aiHintsCount = 0;
-            if (p.getAiHintHistory() != null && !p.getAiHintHistory().isEmpty()) {
-                aiHintsCount = p.getAiHintHistory().split("\\|").length;
-            }
-            int accuracy = 100;
-            if (p.getErrorCount() > 0) {
-                int penalty = p.getErrorCount() * 10;
-                accuracy = Math.max(0, 100 - penalty);
-            }
+        for (StudentProgress progress : students) {
 
-            String cleanError = "Nu a intampinat probleme";
-            if (p.getLastErrorDetails() != null) {
-                cleanError = p.getLastErrorDetails()
-                        .replace("\"", "'")
-                        .replace("{", "")
-                        .replace("}", "")
-                        .replace("\n", " ");
+            int score = progress.getScore() != null ? progress.getScore() : 0;
+            int currentTask = progress.getCurrentTaskIndex() != null ? progress.getCurrentTaskIndex() : 0;
+            int errors = progress.getErrorCount() != null ? progress.getErrorCount() : 0;
+
+            int aiHelpCount = 0;
+            String aiHistory = progress.getAiHintHistory();
+            if (aiHistory != null && !aiHistory.isBlank()) {
+                aiHelpCount = aiHistory.length() > 10 ?
+                        aiHistory.split("Beatrix").length - 1 : 1;
             }
 
-            csv.append(String.format("%s,%d%%,%s,%d,%d,%d%%,\"%s\"\n",
-                    p.getStudentName(),
-                    progressPercent,
-                    status,
-                    p.getErrorCount(),
-                    aiHintsCount,
-                    accuracy,
-                    cleanError
+            csv.append(String.format("%s,%d,%d,%d,%d\n",
+                    progress.getStudentName(),
+                    score,
+                    currentTask,
+                    errors,
+                    aiHelpCount
             ));
         }
+
         return csv.toString();
     }
 

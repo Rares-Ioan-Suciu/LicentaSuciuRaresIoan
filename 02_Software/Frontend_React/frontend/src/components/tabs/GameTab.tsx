@@ -301,23 +301,18 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
     };
 
     if (isTeacher) {
-        // --- NOU: ALGORITMUL DE TRIAGE (SORTARE INTELIGENTĂ) ---
         const sortedStudents = Object.values(students).sort((a: any, b: any) => {
             const aNeedsHelp = a.needsHelp || a.helpStatus === 'PENDING';
             const bNeedsHelp = b.needsHelp || b.helpStatus === 'PENDING';
 
-            // 1. Prioritate maximă: Cine a cerut ajutor manual
             if (aNeedsHelp && !bNeedsHelp) return -1;
             if (!aNeedsHelp && bNeedsHelp) return 1;
 
-            // 2. Prioritate medie: Sortare descrescătoare după numărul de greșeli
             const aErrors = a.errorCount || 0;
             const bErrors = b.errorCount || 0;
             if (aErrors !== bErrors) {
                 return bErrors - aErrors;
             }
-
-            // 3. Prioritate mică: Ordine alfabetică
             return (a.studentName || "").localeCompare(b.studentName || "");
         });
 
@@ -399,7 +394,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                             <button onClick={handleTerminate} style={{ ...s.pinBtn, background: '#ef4444', color: 'white', marginLeft: 'auto' }}>Stop Joc</button>
                         </div>
 
-                        {/* Trimitem lista SORTATĂ către Grilă */}
                         <LiveMonitorGrid students={sortedStudents} accessCode={sessionInfo.accessCode} onAction={handleActionDelegate} />
 
                         <BotSimulator accessCode={sessionInfo.accessCode} sessionId={sessionInfo.id} />

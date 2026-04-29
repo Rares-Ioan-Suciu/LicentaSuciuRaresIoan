@@ -201,6 +201,15 @@ public class BakeryLevelInitializer {
                     "Înlocuim 'la mission' (feminin) cu 'la' (care devine l' în fața vocalei). Acordăm participiul cu 'e'.",
                     Map.of("options", List.of("Oui, je l'ai finie.", "Oui, j'ai fini elle.", "Oui, je le finis.", "Oui, je la fini."), "correctAnswer", "Oui, je l'ai finie.", "imageUrl", imgLouvre), mapper));
 
+            tasks.add(createTask(bakeryLevel, 23, TaskType.MultipleChoice,
+                    "ALERTE ROUGE! Alarmă declanșată. Pentru a ieși, ai nevoie de codul secret (PIN). Codul a été transmis à notre agent (Robotul). Du-te la el și află codul!",
+                    "Mergi fizic la robot, ascultă sau citește cele 4 cifre de pe ecranul lui și selectează opțiunea corectă.",
+                    Map.of(
+                            "options", List.of("1984", "0000", "7392", "4040"),
+                            "correctAnswer", "7392",
+                            "imageUrl", imgLouvre
+                    ), mapper));
+
             gameTaskRepository.saveAll(tasks);
             System.out.println("LOG: Scenariul a fost salvat cu succes (" + tasks.size() + " intrebari).");
         };

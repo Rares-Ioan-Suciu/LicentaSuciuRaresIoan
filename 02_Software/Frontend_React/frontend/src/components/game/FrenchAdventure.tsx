@@ -79,6 +79,19 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
     }, [socket]);
 
     useEffect(() => {
+     
+        if (currentTasks.length > 0 && currentTaskIndex === currentTasks.length - 1) {
+            if (socket && socket.readyState === WebSocket.OPEN && sessionContext) {
+                console.log("🚨 S-a atins ultimul task! Declanșăm codul pe robot.");
+                socket.send(JSON.stringify({
+                    type: "SHOW_EXTRACTION_CODE",
+                    code: "7392" 
+                }));
+            }
+        }
+    }, [currentTaskIndex, currentTasks.length, socket, sessionContext]);
+
+    useEffect(() => {
         const fetchLevelData = async () => {
             try {
                 const data = await GameService.getAllLevels();
@@ -493,28 +506,41 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         );
     }
 
-    if (screen === 'result') return (
-        <div style={styles.container}>
-            <div style={{
-                background: 'white', padding: '60px', borderRadius: '30px',
-                textAlign: 'center', border: '10px solid #f59e0b', boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
-            }}>
-                <h1 style={{ fontSize: '3.5rem', color: '#1e293b', fontWeight: 900 }}>MISSION ACCOMPLISHED 🏅</h1>
-                <p style={{ fontSize: '1.3rem', color: '#64748b', marginBottom: '30px' }}>Ați asigurat toate datele pentru Comandament.</p>
-                <div style={{ fontSize: '6rem', fontWeight: 900, color: '#f59e0b', marginBottom: '40px' }}>{score}</div>
-                <button
-                    onClick={() => setScreen('menu')}
-                    style={{
-                        padding: '18px 50px', background: '#1e293b', color: 'white',
-                        border: 'none', borderRadius: '50px', fontWeight: 'bold',
-                        fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s'
-                    }}
-                >
-                    RE-DEPLOY AGENT
-                </button>
+    if (screen === 'result') {
+        // Tragem o salvă masivă de confetti când se încarcă ecranul final
+        setTimeout(() => {
+            confetti({
+                particleCount: 400,
+                spread: 160,
+                origin: { y: 0.4 },
+                colors: ['#10b981', '#3b82f6', '#fcd34d', '#ef4444', '#a855f7'],
+                zIndex: 10000
+            });
+        }, 100);
+
+        return (
+            <div style={styles.container}>
+                <div style={{
+                    background: 'white', padding: '60px', borderRadius: '30px',
+                    textAlign: 'center', border: '10px solid #f59e0b', boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
+                }}>
+                    <h1 style={{ fontSize: '3.5rem', color: '#1e293b', fontWeight: 900 }}>MISSION ACCOMPLISHED 🏅</h1>
+                    <p style={{ fontSize: '1.3rem', color: '#64748b', marginBottom: '30px' }}>Ați asigurat toate datele pentru Comandament. Alarma a fost dezactivată!</p>
+                    <div style={{ fontSize: '6rem', fontWeight: 900, color: '#f59e0b', marginBottom: '40px' }}>{score}</div>
+                    <button
+                        onClick={() => window.location.reload()}
+                        style={{
+                            padding: '18px 50px', background: '#1e293b', color: 'white',
+                            border: 'none', borderRadius: '50px', fontWeight: 'bold',
+                            fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s'
+                        }}
+                    >
+                        RE-DEPLOY AGENT
+                    </button>
+                </div>
             </div>
-        </div>
-    );
+        );
+    }
 
     return null;
 };
