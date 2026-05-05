@@ -22,14 +22,13 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final GameSessionService gameSessionService;
     private final OpenAIService openAIService;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String ESP32_IP = "192.168.1.140";
+    private final String ESP32_IP = "192.168.1.7";
 
     private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
 
     private volatile String stationedStudent = null;
     private volatile String stationedAccessCode = null;
-    private volatile String stationedLanguage = "ro"; // Salvăm limba elevului la care a fost trimis robotul
-
+    private volatile String stationedLanguage = "ro";
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         System.out.println("SERVER A PRIMIT: " + message.getPayload());
@@ -61,7 +60,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 handleTeacherReply(json, accessCode);
                 break;
             case "SHOW_EXTRACTION_CODE":
-                // Rutează comanda de puzzle fizic de la profesor direct către robot
                 sendToUser("GLOBAL", "robot", Map.of(
                         "type", "SHOW_EXTRACTION_CODE",
                         "code", json.path("code").asText("0000")
@@ -89,7 +87,6 @@ public class GameSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // Funcție mică pentru a detecta materia pe baza textului din task
     private String detectLanguage(String text) {
         String lower = text.toLowerCase();
         if (lower.contains("francez") || lower.contains("tradu") || lower.contains("louvre")
@@ -101,39 +98,32 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
     private void handleAiDelegation(JsonNode json, String code) throws Exception {
         String studentName = json.has("studentName") ? json.path("studentName").asText("Elev") : json.path("username").asText("Elev");
-        String taskRequirement = json.path("task").asText("Nespecificată");
-        Long sessionId = json.path("sessionId").asLong();
 
-        JsonNode details = json.path("details");
-        if (details.isTextual() && details.asText().startsWith("{")) {
-            try {
-                details = objectMapper.readTree(details.asText());
-            } catch (Exception e) {
-                System.err.println("Eroare la parsarea detaliilor JSON: " + e.getMessage());
-            }
+        String detailsStr = json.path("details").asText();
+        if (detailsStr.isBlank() || !detailsStr.startsWith("{")) {
+            detailsStr = json.path("task").asText("{}");
         }
+
+        JsonNode details = objectMapper.readTree(detailsStr.startsWith("{") ? detailsStr : "{}");
+
+        String question = details.path("question").asText("Cerință lipsă");
+        String correctAnswer = details.path("correctAnswer").asText("Lipsă");
+        String studentAnswer = details.path("studentAnswer").asText("Lipsă");
+
+        String fullContext = String.format(
+                "Întrebare/Cerință: %s | Răspuns Corect: %s | Răspunsul Greșit al Elevului: %s",
+                question, correctAnswer, studentAnswer
+        );
 
         StudentProgress progress = gameSessionService.getStudentProgress(code, studentName);
         String history = progress.getAiHintHistory() != null ? progress.getAiHintHistory() : "";
 
-        String question = details.path("question").asText("Nespecificată");
-        String correctAnswer = details.path("correctAnswer").asText("Nespecificat");
-        String studentAnswer = details.path("studentAnswer").asText("Nespecificat");
-        String extraContext = details.path("context").asText("Fără note suplimentare");
-
-        String fullContext = String.format(
-                "Cerință: %s | Context Întrebare: %s | Răspuns Corect: %s | Răspuns Elev: %s | Detalii Extra: %s",
-                taskRequirement, question, correctAnswer, studentAnswer, extraContext
-        );
-
-        // Detectăm limba și o salvăm pentru sesiunea robotului cu acest elev
         String limba = detectLanguage(fullContext);
         if (studentName.equals(stationedStudent)) {
             stationedLanguage = limba;
         }
 
-        // Generăm hint-ul trimițând și parametrul de limbă ('fr' sau 'ro') către AI
-        String hint = openAIService.generateAIHint(fullContext, taskRequirement, history, limba);
+        String hint = openAIService.generateAIHint(fullContext, question, history, limba);
 
         gameSessionService.addAiHintToHistory(code, studentName, hint);
 
@@ -143,18 +133,21 @@ public class GameSocketHandler extends TextWebSocketHandler {
                 "timestamp", System.currentTimeMillis()
         ));
 
-        // Trimitem feedback-ul text la elev pe laptop
         sendToUser(code, studentName, Map.of(
                 "type", "ai_feedback",
                 "message", "Beatrix: " + hint
         ));
 
-        // Trimitem feedback-ul VOCAL către Fața Robotului cu setarea de limbă corectă
-        sendToUser("GLOBAL", "robot", Map.of(
-                "type", "VOICE_HINT",
-                "message", hint,
-                "lang", limba.equals("fr") ? "fr-FR" : "ro-RO"
-        ));
+        if (studentName.equals(stationedStudent) && code.equals(stationedAccessCode)) {
+            sendToUser("GLOBAL", "robot", Map.of(
+                    "type", "VOICE_HINT",
+                    "message", hint,
+                    "lang", limba.equals("fr") ? "fr-FR" : "ro-RO"
+            ));
+            System.out.println("[ROBOT] Robotul este la elev, așa că rostește sfatul cu voce tare.");
+        } else {
+            System.out.println("[ROBOT] Sfat trimis doar text. Robotul nu este delegat fizic la acest elev.");
+        }
     }
 
     private void handleWrongAnswer(JsonNode json, String code) throws Exception {

@@ -3,13 +3,13 @@ import { GameService } from '../../services/GameService';
 import type { GameLevel, GameTask } from '../../types/game';
 import { styles, injectGlobalStyles } from './CSAdventureStyles';
 
-// Importul componentelor pentru tipurile de task-uri (Quiz, Vizual, Drag&Drop, Construire Propoziții)
 import MultipleChoiceTask from './tasks/MultipleChoiceTask';
 import VisualIDTask from './tasks/VisualIDTask';
 import DragAndDropTask from './tasks/DragAndDropTask';
 import SentenceBuilderTask from './tasks/SentenceBuilderTask';
+import confetti from 'canvas-confetti';
 
-// Imagine de fallback pentru meniu
+
 import menu_game from '../../assets/cs_intro.jpg';
 
 interface AlgorithmAdventureProps {
@@ -21,21 +21,16 @@ interface AlgorithmAdventureProps {
     };
 }
 
-/**
- * AlgorithmAdventure - Simulator Spațial de Grafuri
- * Poveste: Restaurarea conexiunii cu un satelit prin repararea nodurilor rețelei.
- */
 const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext }) => {
-    // --- 1. STĂRI DE NAVIGARE ȘI DATE ---
+   
     const [screen, setScreen] = useState<'menu' | 'loading' | 'game' | 'result'>(
         sessionContext ? 'loading' : 'menu'
     );
     const [levels, setLevels] = useState<GameLevel[]>([]);
     const [currentTasks, setCurrentTasks] = useState<GameTask[]>([]);
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-    const [integrity, setIntegrity] = useState(0); // Scorul tematic: Integritatea Sistemului (%)
+    const [integrity, setIntegrity] = useState(0); 
 
-    // --- 2. COMUNICAȚII ȘI FEEDBACK ---
     const [feedback, setFeedback] = useState<'none' | 'correct' | 'wrong'>('none');
     const [socket, setSocket] = useState<WebSocket | null>(null);
     const [hasErrorOnTask, setHasErrorOnTask] = useState(false);
@@ -43,16 +38,14 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
     const [aiFeedback, setAiFeedback] = useState<string>("");
     const [feedbackSource, setFeedbackSource] = useState<'AI' | 'ROBOT' | 'TEACHER' | null>(null);
 
-    // --- 3. RECONECTARE ȘI SIGURANȚĂ REȚEA ---
     const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
     const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // --- EFECT: ACTIVARE STILURI GLOBALE (Fix Vizibilitate SVG) ---
+ 
     useEffect(() => {
-        injectGlobalStyles(); // Forțează grafurile negre să devină Cyan/Alb pe fundalul întunecat
+        injectGlobalStyles();
     }, []);
 
-    // --- EFECT: ENGINE WEBSOCKET CU AUTO-RECONNECT ---
     useEffect(() => {
         const fetchLevelData = async () => {
             try {
@@ -67,20 +60,17 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
         if (!sessionContext) return;
         let isComponentMounted = true;
 
-        /**
-         * Inițializează și monitorizează legătura cu serverul
-         */
+
         const connectToUplink = (retryCount = 0) => {
             if (!isComponentMounted) return;
 
-            const ws = new WebSocket("ws://localhost:8080/ws_game");
+            const ws = new WebSocket("ws://192.168.1.13:8080/ws_game");
 
             ws.onopen = () => {
                 if (!isComponentMounted) { ws.close(); return; }
-                console.log("📡 [UPLINK] Conexiune stabilită cu Mission Control.");
+                console.log("Conexiune stabilită cu backend.");
                 setConnectionStatus('connected');
 
-                // Autentificăm terminalul elevului
                 ws.send(JSON.stringify({
                     type: "JOIN",
                     role: "STUDENT",
@@ -100,7 +90,6 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
 
                 if (data.type === "BROADCAST_PIN") setActivePin(data.text);
 
-                // Procesăm feedback-ul primit de la AI sau Profesor
                 if (data.type === "ai_feedback") {
                     setAiFeedback(data.message);
                     setFeedbackSource('AI');
@@ -118,7 +107,6 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                 console.warn("⚠️ [SIGNAL LOST] Re-stabilire legătură...");
                 setConnectionStatus('reconnecting');
 
-                // Algoritm de așteptare exponențială (1s, 2s, 4s... max 10s)
                 const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
                 reconnectTimeout.current = setTimeout(() => connectToUplink(retryCount + 1), delay);
             };
@@ -140,7 +128,6 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
         };
     }, [sessionContext]);
 
-    // --- EFECT: DETECTOR NATIV DE BROWSER (PENTRU WI-FI OPRIT) ---
     useEffect(() => {
         const handleOffline = () => {
             setConnectionStatus('reconnecting');
@@ -151,28 +138,51 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
         return () => window.removeEventListener('offline', handleOffline);
     }, [socket]);
 
-    // --- EFECT: PORNIRE AUTOMATĂ NIVEL DIN CONTEXT ---
     useEffect(() => {
         if (sessionContext?.levelId && screen === 'loading') {
             startLevel(sessionContext.levelId);
         }
     }, [sessionContext, screen]);
 
-    // --- LOGICĂ JOC ---
     const startLevel = async (levelId: number) => {
         setScreen('loading');
         setAiFeedback("");
         try {
             const tasks = await GameService.getLevelTasks(levelId);
-            // Parsăm datele SVG și JSON din DB
+
             const parsedTasks = tasks.map(t => ({
                 ...t,
                 parsedData: typeof t.taskData === 'string' ? JSON.parse(t.taskData) : t.taskData
             }));
             setCurrentTasks(parsedTasks);
-            setCurrentTaskIndex(0);
-            setIntegrity(0);
-            setScreen('game');
+
+            let startingIndex = 0;
+            if (sessionContext) {
+                const joinUrl = `http://192.168.1.13:8080/api/sessions/join?code=${sessionContext.accessCode}&name=${sessionContext.username}`;
+                const res = await fetch(joinUrl, { method: 'POST' });
+
+                if (res.ok) {
+                    const progress = await res.json();
+                    startingIndex = progress.currentTaskIndex || 0;
+                } else {
+                    
+                    alert("Sesiunea a fost închisă sau nu mai este valabilă.");
+                    localStorage.removeItem('robot_active_session');
+                    localStorage.removeItem('robot_student_code');
+                    window.location.reload();
+                    return; 
+                }
+            }
+
+            setCurrentTaskIndex(startingIndex);
+           
+            setIntegrity(Math.min(Math.round((startingIndex / parsedTasks.length) * 100), 100));
+
+            if (startingIndex >= parsedTasks.length && parsedTasks.length > 0) {
+                setScreen('result');
+            } else {
+                setScreen('game');
+            }
         } catch (error) {
             console.error("Eroare inițializare sectoare:", error);
             setScreen('menu');
@@ -185,8 +195,14 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
         const currentTask = currentTasks[currentTaskIndex];
 
         if (isCorrect) {
+              confetti({
+                            particleCount: 150,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                            colors: ['#10b981', '#3b82f6', '#fcd34d']
+                        });
             setHasErrorOnTask(false);
-            const nextIntegrity = Math.min(integrity + 10, 100);
+            const nextIntegrity = Math.min(integrity + 1 / 32 * 100, 100);
             const nextIndex = currentTaskIndex + 1;
 
             setIntegrity(nextIntegrity);
@@ -213,6 +229,14 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
             setHasErrorOnTask(true);
             setFeedback('wrong');
 
+           
+            const expectedAnswer = currentTask.parsedData?.correctAnswer ||
+                currentTask.parsedData?.correctOrder?.join(', ') ||
+                "Acțiune vizuală corectă";
+
+            let studentAnsText = String(answerValue);
+            if (Array.isArray(answerValue)) studentAnsText = answerValue.join(', ');
+
             if (socket?.readyState === WebSocket.OPEN && sessionContext) {
                 socket.send(JSON.stringify({
                     type: "wrong_answer",
@@ -223,9 +247,9 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                     taskIndex: currentTaskIndex,
                     details: {
                         question: currentTask.requirement,
-                        correctAnswer: "Check graph node consistency",
-                        studentAnswer: "Data parity error on node selection",
-                        context: currentTask.aiHintContext || "Analizează conexiunile nodurilor."
+                        correctAnswer: expectedAnswer,     
+                        studentAnswer: studentAnsText,     
+                        context: currentTask.aiHintContext || "Analizează cerința și graficul aferent."
                     }
                 }));
             }
@@ -242,7 +266,7 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                 sessionId: sessionContext.sessionId,
                 accessCode: sessionContext.accessCode
             }));
-            alert("🚨 Solicitare transmisă terminalului central. Așteaptă date de la AI sau Profesor.");
+            alert("Solicitare transmisă terminalului central. Așteaptă date de la AI sau Profesor.");
         }
     };
 
@@ -251,7 +275,7 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
         if (taskData && taskData.svgContent) {
             return (
                 <div
-                    className="svg-visual-container" // Clasa critică pentru injectGlobalStyles
+                    className="svg-visual-container" 
                     style={styles.svgVisualContainer}
                     dangerouslySetInnerHTML={{ __html: taskData.svgContent }}
                 />
@@ -260,36 +284,19 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
         return <img src={task.imageUrl || menu_game} alt="Space Sector" style={styles.sceneImage} />;
     };
 
-    // --- RENDER SCREEN: MENU ---
-    if (screen === 'menu') return (
-        <div style={styles.menuContainer}>
-            <h2 style={{ fontSize: '2.5rem', marginBottom: '30px', fontWeight: 900, letterSpacing: '4px' }}>
-                🌌 MISSION CONTROL
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                {levels.map(l => (
-                    <button key={l.id} onClick={() => startLevel(l.id)} style={{ padding: '20px 40px', background: '#22d3ee', color: '#000', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}>
-                        INITIATE: {l.title}
-                    </button>
-                ))}
-            </div>
-        </div>
-    );
+    
 
-    // --- RENDER SCREEN: LOADING ---
     if (screen === 'loading') return (
         <div style={styles.menuContainer}>
             <div style={styles.centerText}>🛰️ SYNCING SATELLITE UPLINK...</div>
         </div>
     );
 
-    // --- RENDER SCREEN: MAIN GAME ---
     if (screen === 'game' && currentTasks.length > 0) {
         const task = currentTasks[currentTaskIndex];
         return (
             <div style={{ ...styles.container, position: 'relative' }}>
 
-                {/* BANNER DE SIGURANȚĂ (RECONECTARE) */}
                 {connectionStatus === 'reconnecting' && (
                     <div style={{
                         position: 'absolute', inset: 0, backgroundColor: 'rgba(2, 6, 23, 0.95)',
@@ -309,18 +316,27 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                 )}
 
                 <div style={styles.gameContainer}>
-                    {/* BARA DE STATUS (HUD) */}
                     <div style={styles.hud}>
                         <div style={styles.scoreBox}>
                             <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>SYSTEM INTEGRITY:</span> {integrity}%
                         </div>
-                        <div style={{ fontWeight: 900, color: '#facc15' }}>
+                        <div style={{ fontWeight: 900, color: '#facc15', marginLeft: '750px' }}>
                             CORE SECTOR: <span style={{ color: '#22d3ee' }}>{currentTaskIndex + 1}</span> / {currentTasks.length}
                         </div>
+                        
+
+                        <button onClick={() => {
+                            if (window.confirm("Abandonezi misiunea? Progresul tău e salvat.")) {
+                                localStorage.removeItem('robot_active_session');
+                                localStorage.removeItem('robot_student_code');
+                                window.location.reload();
+                            }
+                        }} style={{ marginLeft: 'auto', padding: '6px 14px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                            ABORT MISSION
+                        </button>
                     </div>
 
                     <div style={styles.mainGameArea}>
-                        {/* COLOANA STÂNGA: VIZUALIZARE GRAF (SVG) */}
                         <div style={styles.leftColumn}>
                             {renderVisualArea(task)}
 
@@ -333,7 +349,6 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                                 />
                             )}
 
-                            {/* FEEDBACK TEMATIC SUPRAPUS */}
                             {feedback === 'correct' && (
                                 <div style={styles.feedbackCorrect}>
                                     <div style={{ letterSpacing: '4px' }}>UPLINK STABLE</div>
@@ -348,7 +363,6 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                             )}
                         </div>
 
-                        {/* COLOANA DREAPTĂ: INSTRUCȚIUNI ȘI COMUNICARE */}
                         <div style={styles.rightColumn}>
                             <div style={styles.taskSection}>
                                 <div style={styles.dialogueBox}>
@@ -389,7 +403,6 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
                                 </div>
                             </div>
 
-                            {/* PANEL CHAT / ASISTENȚĂ AI */}
                             <div style={styles.chatSection}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                     <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#22d3ee', textTransform: 'uppercase' }}>Encrypted Terminal</span>
@@ -431,35 +444,106 @@ const AlgorithmAdventure: React.FC<AlgorithmAdventureProps> = ({ sessionContext 
             </div>
         );
     }
+    if (screen === 'result'){
 
-    // --- RENDER SCREEN: MISSION COMPLETE ---
-    if (screen === 'result') return (
-        <div style={styles.container}>
-            <div style={styles.resultContainer}>
-                <div style={{ fontSize: '5rem', marginBottom: '25px' }}>🛰️✨</div>
-                <h1 style={{ fontSize: '2.8rem', marginBottom: '10px', color: '#22d3ee', letterSpacing: '2px' }}>
+           setTimeout(() => {
+                    confetti({
+                        particleCount: 400,
+                        spread: 160,
+                        origin: { y: 0.4 },
+                        colors: ['#10b981', '#3b82f6', '#fcd34d', '#ef4444', '#a855f7'],
+                        zIndex: 10000
+                    });
+                }, 100);
+        
+        return (
+
+        
+        <div style={{
+            ...styles.container,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingLeft: '15%' 
+        }}>
+            <div style={{
+                ...styles.resultContainer,
+                maxWidth: '500px', 
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '40px',
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                borderRadius: '24px',
+                border: '1px solid rgba(34, 211, 238, 0.3)',
+                backdropFilter: 'blur(20px)'
+            }}>
+                <h1 style={{
+                    fontSize: '2.2rem', 
+                    marginBottom: '5px',
+                    color: '#22d3ee',
+                    letterSpacing: '2px',
+                    fontWeight: 900
+                }}>
                     MISSION SUCCESS
                 </h1>
-                <p style={{ fontSize: '1.2rem', color: '#94a3b8' }}>All satellite sectors are operational and synced.</p>
 
-                <div style={{ margin: '45px 0' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#22d3ee', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '1px' }}>Final Integrity Level</div>
-                    <div style={{ fontSize: '6rem', fontWeight: 900, color: '#22d3ee', textShadow: '0 0 40px rgba(34, 211, 238, 0.7)' }}>
+                <p style={{
+                    fontSize: '1rem',
+                    color: '#94a3b8',
+                    marginBottom: '20px',
+                    lineHeight: '1.4'
+                }}>
+                    Sectoare sincronizate.
+                </p>
+
+                <div style={{ margin: '30px 0' }}>
+                    <div style={{
+                        fontSize: '0.7rem',
+                        color: '#22d3ee',
+                        textTransform: 'uppercase',
+                        marginBottom: '5px',
+                        letterSpacing: '2px',
+                        opacity: 0.8
+                    }}>
+                        Final Integrity
+                    </div>
+                    <div style={{
+                        fontSize: '5rem',
+                        fontWeight: 900,
+                        color: '#22d3ee',
+                        textShadow: '0 0 30px rgba(34, 211, 238, 0.5)',
+                        lineHeight: '1'
+                    }}>
                         {integrity}%
                     </div>
                 </div>
 
-                <button onClick={() => setScreen('menu')} style={{
-                    padding: '18px 50px', background: 'transparent', border: '2px solid #22d3ee',
-                    color: '#22d3ee', borderRadius: '50px', fontWeight: '900', cursor: 'pointer',
-                    transition: 'all 0.3s ease', letterSpacing: '3px', textTransform: 'uppercase'
+                <button onClick={() => {
+                    localStorage.removeItem('robot_active_session');
+                    localStorage.removeItem('robot_student_code');
+                    window.location.reload();
+                }} style={{
+                    padding: '14px 40px',
+                    background: 'transparent',
+                    border: '2px solid #22d3ee',
+                    color: '#22d3ee',
+                    borderRadius: '50px',
+                    fontWeight: '900',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                    fontSize: '0.8rem',
+                    marginTop: '10px'
                 }}>
                     RETURN TO BASE
                 </button>
             </div>
         </div>
     );
-
+    }
     return null;
 };
 

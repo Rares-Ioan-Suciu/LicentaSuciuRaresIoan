@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8080/api/sessions";
+const API_URL = "http://192.168.1.13:8080/api/sessions";
 
 export const TeacherService = {
     downloadReport: async (sessionId: number) => {

@@ -20,7 +20,7 @@ const Classes = () => {
 
   const fetchClasses = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/v1/classes', {
+      const res = await fetch("http://192.168.1.13:8080/api/v1/classes", {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       if (res.ok) {
@@ -44,7 +44,7 @@ const Classes = () => {
     const desc = prompt("Descriere (optional):") || "";
 
     try {
-      const res = await fetch('http://localhost:8080/api/v1/classes', {
+      const res = await fetch('http://192.168.1.13:8080/api/v1/classes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

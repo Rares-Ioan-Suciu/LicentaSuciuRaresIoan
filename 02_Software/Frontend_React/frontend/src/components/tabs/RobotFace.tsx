@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const ESP32_IP = "192.168.1.140";
+const ESP32_IP = "192.168.1.7";
 
 interface StudentData {
     studentName: string;
@@ -10,10 +10,10 @@ interface StudentData {
     details: string;
 }
 
-// Definim stările emoționale ale robotului
 type EmotionState = 'neutral' | 'thinking' | 'happy' | 'sad' | 'alert';
 
 export const RobotFace: React.FC = () => {
+    const [hasIntroduced, setHasIntroduced] = useState(false);
     const [isAwake, setIsAwake] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [message, setMessage] = useState('Aștept conexiunea...');
@@ -22,13 +22,11 @@ export const RobotFace: React.FC = () => {
     const [isDispatched, setIsDispatched] = useState(false);
     const [targetStudent, setTargetStudent] = useState<StudentData | null>(null);
 
-    // Stare nouă pentru Puzzle-ul Fizic (Escape Room)
     const [secretCode, setSecretCode] = useState<string | null>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const [isBlinking, setIsBlinking] = useState(false);
 
-    // Funcție pentru Wake Lock (să nu se stingă ecranul telefonului)
     const requestWakeLock = async () => {
         try {
             if ('wakeLock' in navigator) {
@@ -40,7 +38,6 @@ export const RobotFace: React.FC = () => {
         }
     };
 
-    // Funcția actualizată pentru a suporta accente native (ex: Franceză reală)
     const speak = (text: string, lang: string = 'ro-RO', targetEmotion: EmotionState = 'neutral'): Promise<void> => {
         return new Promise((resolve) => {
             if (!window.speechSynthesis) {
@@ -51,19 +48,15 @@ export const RobotFace: React.FC = () => {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
-
-            // Căutăm vocea corectă în sistemul de operare
             const voices = window.speechSynthesis.getVoices();
             if (lang === 'fr-FR') {
                 const frenchVoice = voices.find(voice => voice.lang.includes('fr-FR') || voice.lang === 'fr_FR');
                 if (frenchVoice) utterance.voice = frenchVoice;
-                utterance.rate = 0.9; // O idee mai rar pentru claritate
+                utterance.rate = 0.9;
             } else {
                 const romanianVoice = voices.find(voice => voice.lang.includes('ro-RO') || voice.lang === 'ro_RO');
                 if (romanianVoice) utterance.voice = romanianVoice;
             }
-
-            // Ajustăm tonul în funcție de emoție
             if (targetEmotion === 'happy') utterance.pitch = 1.3;
             else if (targetEmotion === 'sad') utterance.pitch = 0.8;
             else utterance.pitch = 1.1;
@@ -92,14 +85,34 @@ export const RobotFace: React.FC = () => {
     const wakeUpRobot = async () => {
         setIsAwake(true);
         requestWakeLock();
-        // Preîncărcăm vocile (unele browsere au nevoie de acest trigger)
         window.speechSynthesis.getVoices();
         await speak("Sistem online.", 'ro-RO', 'happy');
         connectWebSocket();
     };
 
+    const introduceRobot = async () => {
+        setHasIntroduced(true);
+        const introText = "Salutare tuturor! Eu sunt Beatrix, asistentul vostru robotic. Sunt foarte fericită să vă cunosc și abia aștept să începem misiunea de astăzi. Mult succes!";
+        setMessage("Salutare tuturor! Eu sunt Beatrix...");
+        await speak(introText, 'ro-RO', 'happy');
+    };
+
+    const introduceRobotBilingual = async () => {
+        setHasIntroduced(true); 
+        const frenchPart = "Bonjour à tous ! Je suis Beatrix, votre assistante robotique. Je suis très heureuse de vous rencontrer et j'ai hâte de commencer la mission d'aujourd'hui. Bonne chance !";
+        const romanianPart = "Salutare tuturor! Eu sunt Beatrix, asistentul vostru robotic. Sunt foarte fericită să vă cunosc și abia aștept să începem misiunea de astăzi. Mult succes!";
+        setMessage(frenchPart);
+        await speak(frenchPart, 'fr-FR', 'happy');
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        setMessage(romanianPart);
+        await speak(romanianPart, 'ro-RO', 'happy');
+    };
+
+    
+
     const connectWebSocket = () => {
-        const wsUrl = `ws://10.113.105.1:8080/ws_game`; // ATENȚIE: Să te asiguri că e IP-ul tău corect!
+        const wsUrl = `ws://192.168.1.13:8080/ws_game`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -114,28 +127,19 @@ export const RobotFace: React.FC = () => {
                 if (data.type === 'VOICE_HINT' && data.message) {
                     let textEmotion: EmotionState = 'neutral';
                     const textLower = data.message.toLowerCase();
-                    // Am adăugat și cuvinte cheie din franceză pentru a deduce emoția
                     if (textLower.includes('excelent') || textLower.includes('perfect') || textLower.includes('bravo') || textLower.includes('excellent')) textEmotion = 'happy';
                     if (textLower.includes('of') || textLower.includes('greșit') || textLower.includes('nu e chiar') || textLower.includes('non')) textEmotion = 'sad';
 
-                    // LOGICĂ NOUĂ: Detectăm dacă mesajul este BILINGV (conține '|')
                     if (data.message.includes('|')) {
                         const parts = data.message.split('|');
                         const frenchPart = parts[0].trim();
                         const romanianPart = parts[1].trim();
-
-                        // 1. Vorbește în Franceză
                         setMessage(frenchPart);
                         await speak(frenchPart, 'fr-FR', textEmotion);
-
-                        // Pauză scurtă între limbi
                         await new Promise(resolve => setTimeout(resolve, 500));
-
-                        // 2. Vorbește în Română
                         setMessage(romanianPart);
                         await speak(romanianPart, 'ro-RO', textEmotion);
                     } else {
-                        // Mesaj normal (o singură limbă, de ex. la Informatică)
                         setMessage(data.message);
                         await speak(data.message, data.lang || 'ro-RO', textEmotion);
                     }
@@ -150,7 +154,6 @@ export const RobotFace: React.FC = () => {
                     await speak(text, 'ro-RO', 'alert');
                 }
 
-                // EVENIMENT NOU: Puzzle-ul Fizic / Extracția
                 if (data.type === 'SHOW_EXTRACTION_CODE' && data.code) {
                     setSecretCode(data.code);
                     setEmotion('alert');
@@ -159,7 +162,6 @@ export const RobotFace: React.FC = () => {
 
                     await speak(textToSpeak, 'fr-FR', 'alert');
 
-                    // Ascundem codul automat după 60 de secunde
                     setTimeout(() => setSecretCode(null), 60000);
                 }
 
@@ -211,12 +213,10 @@ export const RobotFace: React.FC = () => {
         };
     }, []);
 
-    // Clipitul (Blink logic)
     useEffect(() => {
         const blinkLogic = () => {
             const randomTime = Math.random() * (5000 - 2000) + 2000;
             setTimeout(() => {
-                // Nu clipește când gândește, e alert, sau arată codul secret
                 if ((emotion === 'neutral' || emotion === 'happy') && !secretCode) {
                     setIsBlinking(true);
                     setTimeout(() => {
@@ -265,13 +265,30 @@ export const RobotFace: React.FC = () => {
 
     return (
         <div style={styles.container}>
-            <button
-                onClick={() => speak("Bonjour, agent! Le code secret est 7, 3, 9, 2", 'fr-FR', 'happy')}
-                style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 1000, padding: '10px', backgroundColor: '#3b82f6', color: 'white' }}
-            >
-                🇫🇷 Testează Vocea Franceză
-            </button>
-
+            {!hasIntroduced && (
+            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px' }}>
+                <button
+                    onClick={introduceRobot}
+                    style={{
+                        padding: '8px 16px', background: 'transparent', color: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px',
+                        cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase'
+                    }}
+                >
+                    👋 Prez. RO
+                </button>
+                <button
+                    onClick={introduceRobotBilingual}
+                    style={{
+                        padding: '8px 16px', background: 'transparent', color: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px',
+                        cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase'
+                    }}
+                >
+                    🥐 Prez. FR
+                </button>
+            </div>
+    )}
             <style>
                 {`
                 @keyframes thinkBounce {

@@ -84,7 +84,7 @@ export default function TeacherDashboard() {
             onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#218838")}
             onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#28a745")}
           >
-            🤖 Conducere Robot
+            🤖 Robot
           </button>
 
         </div>

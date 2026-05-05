@@ -1,7 +1,7 @@
 import axios from 'axios'; 
 import type { GameTask, GameLevel } from '../types/game';
 
-const BASE_URL = 'http://localhost:8080/api/game';
+const BASE_URL = 'http://192.168.1.13:8080/api/game';
 
 export const GameService = {
     getAllLevels: async (): Promise<GameLevel[]> => {

@@ -40,7 +40,7 @@ public class SimpleAuthFilter extends OncePerRequestFilter {
                 uri.startsWith("/api/game/") ||
                 uri.startsWith("/api/sessions/") ||
                 uri.startsWith("/ws_game") ||
-                uri.startsWith("/api/game-socket")) { // <--- ADAUGĂ LINIA ASTA{
+                uri.startsWith("/api/game-socket")) {
 
             System.out.println("Public/Bypass: " + method + " " + uri);
             filterChain.doFilter(request, response);

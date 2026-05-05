@@ -68,7 +68,7 @@ export const styles: Record<string, CSSProperties> = {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        filter: 'drop-shadow(0 0 15px rgba(34, 211, 238, 0.8))', // Glow puternic pentru graf
+        filter: 'drop-shadow(0 0 15px rgba(34, 211, 238, 0.8))', 
         pointerEvents: 'auto'
     },
 
@@ -98,6 +98,14 @@ export const styles: Record<string, CSSProperties> = {
         gap: '12px',
         borderTop: '1px solid rgba(34, 211, 238, 0.1)',
         overflowY: 'auto'
+    },
+
+    sceneImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain', 
+        borderRadius: '12px',
+        opacity: 0.85, 
     },
 
     scoreBox: {
@@ -192,7 +200,6 @@ export const styles: Record<string, CSSProperties> = {
     }
 };
 
-// ACEASTA FUNCȚIE REPARĂ SVG-URILE TALE!
 export const injectGlobalStyles = () => {
     const id = 'game-global-styles';
     if (document.getElementById(id)) return;

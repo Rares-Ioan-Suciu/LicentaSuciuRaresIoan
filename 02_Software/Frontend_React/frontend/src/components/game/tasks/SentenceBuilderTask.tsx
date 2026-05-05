@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { styles } from '../AdventureStyles';
 
 interface SentenceData {
-    words: string[];       
+    words: string[];
     correctSentence?: string;
-    correctOrder?: string[]; 
+    correctOrder?: string[];
 }
 
 interface Props {
@@ -52,7 +52,7 @@ const SentenceBuilderTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) =>
     };
 
     return (
-        <div style={styles.sentenceContainer}>
+        <div style={{ ...styles.sentenceContainer, paddingBottom: '20px' }}>
             <div style={styles.sentenceDisplay}>
                 {selectedWords.length === 0 && (
                     <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Formează propoziția apăsând pe cuvinte...</span>
@@ -68,7 +68,7 @@ const SentenceBuilderTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) =>
                 ))}
             </div>
 
-            <div style={{ ...styles.itemsPool, border: 'none', backgroundColor: 'transparent', minHeight: 'auto' }}>
+            <div style={{ ...styles.itemsPool, border: 'none', backgroundColor: 'transparent', minHeight: 'auto', marginBottom: '20px' }}>
                 {availableWords.map((item) => (
                     <div
                         key={`avail-${item.index}`}
@@ -79,12 +79,21 @@ const SentenceBuilderTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) =>
                     </div>
                 ))}
             </div>
-            
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+
+            <div style={{ display: 'flex', gap: '15px', marginTop: 'auto', justifyContent: 'center' }}>
                 <button
                     onClick={() => setSelectedWords([])}
                     disabled={isDisabled || selectedWords.length === 0}
-                    style={{ ...styles.menuBtn, backgroundColor: '#64748b', fontSize: '0.9rem' }}
+                    style={{
+                        ...styles.menuBtn,
+                        backgroundColor: '#64748b',
+                        color: '#ffffff',
+                        fontSize: '1rem',
+                        padding: '10px 20px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: (isDisabled || selectedWords.length === 0) ? 'not-allowed' : 'pointer'
+                    }}
                 >
                     Reset
                 </button>
@@ -94,7 +103,15 @@ const SentenceBuilderTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) =>
                     disabled={isDisabled || selectedWords.length === 0}
                     style={{
                         ...styles.menuBtn,
-                        backgroundColor: (isDisabled || selectedWords.length === 0) ? '#94a3b8' : '#1e293b'
+                        backgroundColor: (isDisabled || selectedWords.length === 0) ? '#94a3b8' : '#10b981', 
+                        color: '#ffffff', 
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        padding: '10px 20px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: (isDisabled || selectedWords.length === 0) ? 'not-allowed' : 'pointer',
+                        boxShadow: (isDisabled || selectedWords.length === 0) ? 'none' : '0 4px 6px -1px rgba(16, 185, 129, 0.4)'
                     }}
                 >
                     {isDisabled ? 'Se verifică...' : 'Verifică Propoziția'}

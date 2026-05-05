@@ -4,6 +4,8 @@ interface StudentCardProps {
     data: any;
     totalTasks: number;
     onAction: (type: 'AI_DELEGATE' | 'ROBOT_DELEGATE' | 'TEACHER_REPLY' | 'CANCEL_ROBOT') => void;
+    isPending: boolean;
+    isResponded: boolean;
 }
 
 const renderErrorDetails = (errorDetails: string) => {
@@ -22,18 +24,17 @@ const renderErrorDetails = (errorDetails: string) => {
     }
 }
 
-const StudentCard: React.FC<StudentCardProps> = ({ data, totalTasks, onAction }) => {
+const StudentCard: React.FC<StudentCardProps> = ({ data, totalTasks, onAction, isPending, isResponded }) => {
     const needsHelp = data.needsHelp === true || data.helpStatus === 'PENDING';
-    const isRobotOnTheWay = data.robotOnTheWay === true; // Starea nouă!
-
     const currentTask = data.currentTaskIndex !== undefined ? data.currentTaskIndex + 1 : 1;
-    const progressPercent = Math.min((currentTask / totalTasks) * 100, 100);
 
     return (
         <div style={{
             ...localStyles.card,
-            border: needsHelp ? (isRobotOnTheWay ? '3px dashed #eab308' : '3px solid #f43f5e') : '1px solid #e2e8f0',
-            boxShadow: needsHelp ? '0 10px 30px rgba(244, 63, 94, 0.2)' : '0 4px 6px rgba(0,0,0,0.05)'
+            opacity: isPending ? 0.7 : 1,
+            pointerEvents: isPending ? 'none' : 'auto',
+            border: needsHelp ? (isResponded ? '3px solid #10b981' : '3px solid #f43f5e') : '1px solid #e2e8f0',
+            boxShadow: needsHelp && !isResponded ? '0 10px 30px rgba(244, 63, 94, 0.2)' : '0 4px 6px rgba(0,0,0,0.05)'
         }}>
             <div style={localStyles.header}>
                 <div>
@@ -56,43 +57,56 @@ const StudentCard: React.FC<StudentCardProps> = ({ data, totalTasks, onAction })
                 </div>
             </div>
 
-            {/* BUTOANELE NORMALE CÂND ROBOTUL NU A PLECAT ÎNCĂ */}
-            {needsHelp && !isRobotOnTheWay && (
+            {needsHelp && (
                 <div style={{ marginTop: '16px' }}>
-                    <div style={localStyles.sosBadge}>Solicitare Ajutor</div>
-                    {renderErrorDetails(data.lastErrorDetails)}
-
-                    <div style={localStyles.actionGrid}>
-                        <button onClick={() => onAction('TEACHER_REPLY')} style={{ ...localStyles.btn, background: '#1e293b' }}>
-                            Intervin Eu
-                        </button>
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button onClick={() => onAction('AI_DELEGATE')} style={{ ...localStyles.btn, flex: 1, background: '#6366f1' }}>Delegare AI (Instant)</button>
-                            <button onClick={() => onAction('ROBOT_DELEGATE')} style={{ ...localStyles.btn, flex: 1, background: '#f59e0b' }}>🏃‍♂️ Trimite Robotul</button>
+                    {isResponded ? (
+                        <div style={{
+                            padding: '15px', background: '#f0fdf4', borderRadius: '12px',
+                            border: '1px solid #bbf7d0', textAlign: 'center'
+                        }}>
+                            <span style={{ fontSize: '1.2rem' }}>✅</span>
+                            <strong style={{ color: '#166534', marginLeft: '8px' }}>Asistență oferită</strong>
+                            <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem', color: '#166534' }}>
+                                Elevul a primit indicații. Cardul se va reseta la terminarea task-ului.
+                            </p>
                         </div>
-                    </div>
-                </div>
-            )}
+                    ) : (
+                      
+                        <>
+                            <div style={localStyles.sosBadge}>
+                                {isPending ? 'Se transmite comanda...' : 'Solicitare Ajutor'}
+                            </div>
 
-            {/* UI NOU PENTRU CÂND ROBOTUL ESTE PE DRUM */}
-            {needsHelp && isRobotOnTheWay && (
-                <div style={{ marginTop: '16px', padding: '20px', background: '#fef9c3', borderRadius: '16px', border: '3px dashed #eab308', textAlign: 'center' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '5px' }}>🏃‍♂️🤖</div>
-                    <div style={{ fontWeight: 900, color: '#854d0e', fontSize: '1.2rem', marginBottom: '15px' }}>
-                        Robotul se deplasează spre elev...
-                    </div>
-                    <button
-                        onClick={() => onAction('AI_DELEGATE')}
-                        style={{ ...localStyles.btn, background: '#10b981', width: '100%', marginBottom: '10px', boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)' }}
-                    >
-                        📍 Confirmă Ajungerea & Vorbește!
-                    </button>
-                    <button
-                        onClick={() => onAction('CANCEL_ROBOT')}
-                        style={{ ...localStyles.btn, background: '#ef4444', width: '100%', padding: '12px', fontSize: '1rem' }}
-                    >
-                        Anulează deplasarea
-                    </button>
+                            {renderErrorDetails(data.lastErrorDetails)}
+
+                            <div style={localStyles.actionGrid}>
+                                <button
+                                    disabled={isPending}
+                                    onClick={() => onAction('TEACHER_REPLY')}
+                                    style={{ ...localStyles.btn, background: isPending ? '#94a3b8' : '#1e293b' }}
+                                >
+                                    {isPending ? 'Te rog așteaptă...' : 'Intervin Eu'}
+                                </button>
+
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button
+                                        disabled={isPending}
+                                        onClick={() => onAction('AI_DELEGATE')}
+                                        style={{ ...localStyles.btn, flex: 1, background: isPending ? '#94a3b8' : '#6366f1' }}
+                                    >
+                                        Delegare AI
+                                    </button>
+                                    <button
+                                        disabled={isPending}
+                                        onClick={() => onAction('ROBOT_DELEGATE')}
+                                        style={{ ...localStyles.btn, flex: 1, background: isPending ? '#94a3b8' : '#f59e0b' }}
+                                    >
+                                        🏃‍♂️ Trimite Robot
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
         </div>

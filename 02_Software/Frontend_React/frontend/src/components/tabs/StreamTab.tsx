@@ -58,9 +58,9 @@ const StreamTab = ({ classroom, isTeacher, onPost }: StreamTabProps) => {
                         <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 
                             <strong style={{ color: '#000', fontSize: '1rem' }}>
-                                { user.full_name || "USER" }
+                               
+                                {ann.author || classroom.teacher?.full_name || "Profesor"}
                             </strong>
-
                             <span style={{ color: '#888' }}>
                                 {formatDate(ann.postedAt || ann.posted_at)}
                             </span>

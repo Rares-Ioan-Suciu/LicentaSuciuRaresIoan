@@ -22,45 +22,47 @@ public class OpenAIService {
     private final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private final RestTemplate restTemplate = new RestTemplate();
 
-    /**
-     * Generează un indiciu inteligent.
-     * @param language Limba dorită: "fr" pentru franceză (bilingv), "ro" pentru română.
-     */
     public String generateAIHint(String studentContext, String taskName, String history, String language) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // BEATRIX BILINGVĂ
-        String systemPrompt = """
-                Tu es Beatrix, un robot assistant éducatif, amical et encourageant. 
-                
-                REGULI STRICTE DE COMUNICARE:
-                1. DACA LIMBA ESTE 'fr' (FRANCEZĂ):
-                   - Răspunde OBLIGATORIU BILINGV (Franceză și Română).
-                   - FORMAT STRICT: Scrie indiciul în franceză, pune un singur simbol '|', apoi scrie traducerea sau explicația în română.
-                   - Exemplu: "Regarde bien la fin du mot ! | Uită-te cu atenție la finalul cuvântului!"
-                   - Tonul trebuie să fie entuziast.
-                
-                2. DACA LIMBA ESTE 'ro' (ROMÂNĂ):
-                   - Răspunde EXCLUSIV în limba ROMÂNĂ.
-                   - NU folosi deloc simbolul '|'.
-                
-                3. REGULI GENERALE:
-                   - Fii scurtă: maxim o propoziție în limba 1, o propoziție în limba 2.
-                   - NU da niciodată răspunsul corect direct! Oferă o pistă de gândire, o regulă sau o analogie.
-                """;
+        String systemPrompt;
+        String userMessage;
 
-        String userMessage = String.format(
-                "MATERIA/LIMBA SOLICITATĂ: %s\n" +
-                        "EXERCIȚIU: %s\n" +
-                        "EROAREA ELEVULUI ȘI CONTEXTUL: %s\n" +
-                        "ISTORIC INDICII: %s\n\n" +
-                        "Te rog, Beatrix, oferă-i elevului indiciul respectând strict formatul cerut:",
-                language.equals("fr") ? "FRANCEZĂ (BILINGV)" : "ROMÂNĂ",
-                taskName,
-                studentContext,
-                (history != null && !history.isBlank()) ? history : "Prima greșeală."
+        if ("fr".equals(language)) {
+            systemPrompt = """
+                    Ești Beatrix, un prieten și asistent educațional de limba franceză. 
+                    Personalitatea ta: Vorbești de la egal la egal cu elevul, ești super empatic, cald și mereu îl încurajezi când greșește.
+                    
+                    REGULI STRICTE (ECHILIBRUL TĂU):
+                    1. FII CONCRET ȘI TEHNIC: Bazează-te STRICT pe contextul primit (Cerință, Răspuns Greșit, Răspuns Corect). Explică direct și clar regula gramaticală, acordul sau vocabularul care i-a scăpat.
+                    2. FĂRĂ METAFORE PROFUNDE: Ești prietenos, dar rămâi cu picioarele pe pământ. Nu inventa povești sau analogii lungi. Focusează-te pe datele exercițiului.
+                    3. BILINGV OBLIGATORIU: [Încurajare & Indiciu în Franceză] | [Traducerea exactă în Română]. Folosește exact un '|'.
+                    4. FII CONCIS: Maxim 35-40 de cuvinte în total.
+                    5. FĂRĂ RĂSPUNSURI MURĂ-N GURĂ: Dă-i un indiciu logic ca să descopere singur soluția, nu-i oferi răspunsul final.
+                    6. MEMORIE (ISTORIC INDICII): Verifică mereu ce i s-a mai zis. NU repeta sfaturi trecute, vino cu o abordare NOUĂ.
+                    7.NU LE DA NICIODATA RASPUNSUL CORECT DIRECT.
+                    """;
+        } else {
+            systemPrompt = """
+                    Ești Beatrix, un prieten și asistent educațional de informatică și logică. 
+                    Personalitatea ta: Vorbești de la egal la egal cu elevul, ești super empatic, cald și mereu îl încurajezi când greșește.
+                    
+                    REGULI STRICTE (ECHILIBRUL TĂU):
+                    1. FII CONCRET ȘI TEHNIC: Bazează-te STRICT pe datele primite. Arată-i exact unde s-a rupt algoritmul sau logica în răspunsul lui.
+                    2. FĂRĂ METAFORE PROFUNDE: Ești prietenos, dar ești programator. Folosește detalii tehnice clare. Fără povești sau analogii lungi care distrag atenția.
+                    3. LIMBA: Răspunde EXCLUSIV în limba Română, într-un ton prietenos dar precis.
+                    4. FII CONCIS: Maxim 35-40 de cuvinte în total.
+                    5. FĂRĂ RĂSPUNSURI MURĂ-N GURĂ: Ghidează-l spre pasul corect din algoritm, fără să îi scrii tu rezolvarea.
+                    6. MEMORIE (ISTORIC INDICII): Verifică mereu ce i s-a mai zis. NU repeta sfaturi trecute, explică-i dintr-un unghi NOU.
+                     7.NU LE DA NICIODATA RASPUNSUL CORECT DIRECT.
+                    """;
+        }
+
+        userMessage = String.format(
+                "CONTEXT EXERCIȚIU:\n%s\n\nISTORIC INDICII DEJA OFERITE:\n%s\n\nGenerează indiciul exact conform regulilor:",
+                studentContext, (history != null && !history.isBlank()) ? history : "Niciun istoric."
         );
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -69,7 +71,8 @@ public class OpenAIService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userMessage)
         ));
-        requestBody.put("temperature", 0.7);
+
+        requestBody.put("temperature", 0.4);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
@@ -78,9 +81,9 @@ public class OpenAIService {
             return extractContentFromResponse(response.getBody());
         } catch (Exception e) {
             System.err.println("[OpenAI Error] " + e.getMessage());
-            return language.equals("fr") ?
-                    "Bip-bop ! Erreur de connexion. | Bip-bop! Am o eroare de conexiune, mai încearcă o dată!" :
-                    "Bip-bop! Am circuitele puțin încurcate. Mai încearcă o dată!";
+            return "fr".equals(language) ?
+                    "Erreur de réseau, veuillez réessayer. | Eroare de rețea, te rog să mai încerci." :
+                    "Eroare de rețea. Te rog verifică din nou exercițiul și mai încearcă.";
         }
     }
 

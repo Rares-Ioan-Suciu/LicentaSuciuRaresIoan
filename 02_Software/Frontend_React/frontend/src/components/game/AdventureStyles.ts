@@ -1,11 +1,11 @@
 import type { CSSProperties } from 'react';
 
 export const styles: Record<string, CSSProperties> = {
-    // Fundalul paginii - stil Agent Secret
+
     container: {
         width: '100%',
         minHeight: '100vh',
-        backgroundColor: '#020617', // Deep Navy
+        backgroundColor: '#020617', 
         backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%)',
         display: 'flex',
         justifyContent: 'center',
@@ -13,7 +13,6 @@ export const styles: Record<string, CSSProperties> = {
         padding: '10px'
     },
 
-    // Tableta de misiune
     gameContainer: {
         width: '95%',
         maxWidth: '1550px',
@@ -28,14 +27,13 @@ export const styles: Record<string, CSSProperties> = {
         border: '4px solid #1e293b'
     },
 
-    // Bara de status a misiunii
     hud: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '15px 40px',
         background: '#0f172a',
-        color: '#fcd34d', // Amber gold
+        color: '#fcd34d',
         borderBottom: '4px solid #f59e0b',
         textTransform: 'uppercase',
         letterSpacing: '2px'
@@ -65,7 +63,6 @@ export const styles: Record<string, CSSProperties> = {
         flexDirection: 'row'
     },
 
-    // Zona de observație (imaginea)
     leftColumn: {
         flex: 1.4,
         backgroundColor: '#000',
@@ -82,8 +79,6 @@ export const styles: Record<string, CSSProperties> = {
         objectFit: 'cover',
         opacity: 0.9
     },
-
-    // Consola de comandă
     rightColumn: {
         flex: 1,
         display: 'flex',
@@ -92,7 +87,6 @@ export const styles: Record<string, CSSProperties> = {
         minWidth: '400px'
     },
 
-    // Secțiunea de instrucțiuni
     taskSection: {
         flex: 1.1,
         display: 'flex',
@@ -102,7 +96,6 @@ export const styles: Record<string, CSSProperties> = {
         overflowY: 'auto'
     },
 
-    // Canalul securizat HQ (Chat AI)
     chatSection: {
         height: '35%',
         backgroundColor: '#0f172a',
@@ -113,7 +106,6 @@ export const styles: Record<string, CSSProperties> = {
         borderTop: '4px solid #1e293b'
     },
 
-    // Dialogue cu informatorul local
     dialogueBox: {
         padding: '20px',
         background: '#fff',
@@ -146,8 +138,6 @@ export const styles: Record<string, CSSProperties> = {
         width: '100%',
         gap: '20px'
     },
-
-    // Mesajele de la HQ
     aiBubble: {
         background: 'rgba(30, 58, 138, 0.4)',
         padding: '15px',
@@ -159,8 +149,6 @@ export const styles: Record<string, CSSProperties> = {
         lineHeight: '1.5',
         borderLeft: '4px solid #3b82f6'
     },
-
-    // Feedback Misiune
     feedbackCorrect: {
         position: 'absolute',
         inset: 0,
@@ -205,7 +193,6 @@ export const styles: Record<string, CSSProperties> = {
         cursor: 'crosshair'
     },
 
-    // STILURI PENTRU DRAG AND DROP (DND)
     dndContainer: {
         display: 'flex',
         flexDirection: 'column',
@@ -264,7 +251,6 @@ export const styles: Record<string, CSSProperties> = {
         marginBottom: '10px'
     },
 
-    // STILURI PENTRU CONSTRUIRE PROPOZIȚII (SENTENCE)
     sentenceContainer: {
         display: 'flex',
         flexDirection: 'column',
@@ -290,14 +276,14 @@ export const styles: Record<string, CSSProperties> = {
     wordBubble: {
         padding: '12px 22px',
         backgroundColor: '#fff',
-        border: '2px solid #f59e0b', // Accent amber
+        border: '2px solid #f59e0b', 
         borderRadius: '12px',
         cursor: 'pointer',
         fontWeight: '800',
         color: '#1e293b',
         fontSize: '1rem',
         transition: 'all 0.2s ease',
-        boxShadow: '0 4px 0px #d97706', // Efect de buton 3D
+        boxShadow: '0 4px 0px #d97706', 
         userSelect: 'none'
     },
     wordBubbleEmpty: {
@@ -309,7 +295,6 @@ export const styles: Record<string, CSSProperties> = {
         cursor: 'not-allowed'
     },
 
-    // MENIUL DE SELECȚIE MISIUNE
     menuGridWrapper: {
         position: 'relative',
         width: '100%',
@@ -340,7 +325,7 @@ export const styles: Record<string, CSSProperties> = {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(245, 158, 11, 0.2)', // Amber tint
+        background: 'rgba(245, 158, 11, 0.2)', 
         color: '#fff',
         cursor: 'pointer',
         border: '2px solid rgba(252, 211, 77, 0.4)',

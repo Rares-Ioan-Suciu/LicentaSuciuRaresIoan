@@ -10,7 +10,7 @@ interface Props {
 
 const VisualIDTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) => {
 
-    const DEBUG_MODE = true;
+    const SHOW_HINT_GLOW = true;
 
     const checkClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDisabled) return;
@@ -18,8 +18,8 @@ const VisualIDTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 1000;
         const y = ((e.clientY - rect.top) / rect.height) * 1000;
-        
-        console.log(`📍 COORDONATE DETECTATE: x: ${x}, y: ${y}`);
+
+        console.log(`Coordonate apasate: x: ${x}, y: ${y}`);
         const { targetZone } = data;
 
         const isHit = x >= targetZone.x && x <= (targetZone.x + targetZone.width) &&
@@ -30,27 +30,32 @@ const VisualIDTask: React.FC<Props> = ({ data, onAnswer, isDisabled }) => {
 
     return (
         <div style={styles.visualIdLayer} onClick={checkClick}>
-            {DEBUG_MODE && data.targetZone && (
-                <div style={{
-                    position: 'absolute',
-                    left: `${data.targetZone.x / 10}%`,
-                    top: `${data.targetZone.y / 10}%`,
-                    width: `${data.targetZone.width / 10}%`,
-                    height: `${data.targetZone.height / 10}%`,
-                    border: '3px dashed #ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.3)',
-                    pointerEvents: 'none', 
-                    zIndex: 100,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    textShadow: '1px 1px 2px black'
-                }}>
-                    ZONĂ CLICK
-                </div>
+            {SHOW_HINT_GLOW && data.targetZone && (
+                <>
+                    <style>
+                        {`
+                            @keyframes subtleGlow {
+                                0% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+                                50% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.5); border-color: rgba(255, 255, 255, 0.6); }
+                                100% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+                            }
+                        `}
+                    </style>
+                    <div style={{
+                        position: 'absolute',
+                        left: `${data.targetZone.x / 10}%`,
+                        top: `${data.targetZone.y / 10}%`,
+                        width: `${data.targetZone.width / 10}%`,
+                        height: `${data.targetZone.height / 10}%`,
+                        border: '1px solid rgba(255, 255, 255, 0.2)', 
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)', 
+                        borderRadius: '8px', 
+                        pointerEvents: 'none', 
+                        zIndex: 10,
+                        animation: 'subtleGlow 2.5s infinite ease-in-out', 
+                    }}>
+                    </div>
+                </>
             )}
         </div>
     );

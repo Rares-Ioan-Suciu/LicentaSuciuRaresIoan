@@ -55,7 +55,7 @@ const DragAndDropTask: React.FC<DragDropProps> = ({ data, onAnswer, isDisabled }
     };
 
     return (
-        <div style={styles.dndContainer}>
+        <div style={{ ...styles.dndContainer, paddingBottom: '20px' }}>
             <div
                 style={styles.itemsPool}
                 onDragOver={(e) => e.preventDefault()}
@@ -71,7 +71,7 @@ const DragAndDropTask: React.FC<DragDropProps> = ({ data, onAnswer, isDisabled }
                         {item.text}
                     </div>
                 ))}
-                {pool.length === 0 && <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Aranjează produsele pe rafturi!</span>}
+                {pool.length === 0 && <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Toate produsele sunt aranjate!</span>}
             </div>
 
             <div style={styles.dropZonesContainer}>
@@ -89,7 +89,7 @@ const DragAndDropTask: React.FC<DragDropProps> = ({ data, onAnswer, isDisabled }
                         {placedItems[zone].map(item => (
                             <div
                                 key={item.id}
-                                draggable={!isDisabled} 
+                                draggable={!isDisabled}
                                 onDragStart={(e) => onDragStart(e, item.id)}
                                 onClick={() => handleMove(item.id, 'pool')}
                                 style={{
@@ -107,17 +107,26 @@ const DragAndDropTask: React.FC<DragDropProps> = ({ data, onAnswer, isDisabled }
             </div>
 
             {isAllPlaced && (
-                <button
-                    onClick={submit}
-                    disabled={isDisabled}
-                    style={{
-                        ...styles.menuBtn,
-                        marginTop: '20px',
-                        backgroundColor: isDisabled ? '#94a3b8' : '#1e293b'
-                    }}
-                >
-                    {isDisabled ? 'Se verifică...' : 'Validează răspunsul'}
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '20px' }}>
+                    <button
+                        onClick={submit}
+                        disabled={isDisabled}
+                        style={{
+                            ...styles.menuBtn,
+                            backgroundColor: isDisabled ? '#94a3b8' : '#10b981', 
+                            color: '#ffffff', 
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold',
+                            padding: '12px 30px',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            boxShadow: isDisabled ? 'none' : '0 4px 6px -1px rgba(16, 185, 129, 0.4)'
+                        }}
+                    >
+                        {isDisabled ? 'Se verifică...' : 'Validează răspunsul'}
+                    </button>
+                </div>
             )}
         </div>
     );

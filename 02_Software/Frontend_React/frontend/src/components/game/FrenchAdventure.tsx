@@ -58,7 +58,7 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
 
     useEffect(() => {
         const handleOffline = () => {
-            console.warn("🌐 Browser-ul a pierdut conexiunea la internet!");
+            console.warn("Browser-ul a pierdut conexiunea la internet!");
             setConnectionStatus('reconnecting');
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.close();
@@ -66,7 +66,7 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         };
 
         const handleOnline = () => {
-            console.log("🌐 Internetul a revenit!");
+            console.log("Internetul a revenit!");
         };
 
         window.addEventListener('offline', handleOffline);
@@ -82,7 +82,6 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
      
         if (currentTasks.length > 0 && currentTaskIndex === currentTasks.length - 1) {
             if (socket && socket.readyState === WebSocket.OPEN && sessionContext) {
-                console.log("🚨 S-a atins ultimul task! Declanșăm codul pe robot.");
                 socket.send(JSON.stringify({
                     type: "SHOW_EXTRACTION_CODE",
                     code: "7392" 
@@ -106,7 +105,7 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         const connectWebSocket = (retryCount = 0) => {
             if (!isComponentMounted) return;
 
-            const ws = new WebSocket("ws://localhost:8080/ws_game");
+            const ws = new WebSocket("ws://192.168.1.13:8080/ws_game");
 
             ws.onopen = () => {
                 if (!isComponentMounted) { ws.close(); return; }
@@ -178,7 +177,6 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         };
     }, [sessionContext]);
 
-    // 3. LOGICĂ PORNIRE MISIUNE
     const startLevel = async (levelId: number) => {
         setScreen('loading');
         setAiFeedback("");
@@ -186,11 +184,36 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         try {
             const tasks = await GameService.getLevelTasks(levelId);
             setCurrentTasks(tasks);
-            setCurrentTaskIndex(0);
-            setScore(0);
-            setScreen('game');
+
+            let startingIndex = 0;
+            let startingScore = 0;
+            if (sessionContext) {
+                const joinUrl = `http://192.168.1.13:8080/api/sessions/join?code=${sessionContext.accessCode}&name=${sessionContext.username}`;
+                const res = await fetch(joinUrl, { method: 'POST' });
+
+                if (res.ok) {
+                    const progress = await res.json();
+                    startingIndex = progress.currentTaskIndex || 0;
+                    startingScore = progress.score || 0;
+                } else {
+                    alert("Sesiunea a fost închisă sau nu mai este valabilă.");
+                    localStorage.removeItem('robot_active_session');
+                    localStorage.removeItem('robot_student_code');
+                    window.location.reload();
+                    return; 
+                }
+            }
+
+            setCurrentTaskIndex(startingIndex);
+            setScore(startingScore);
+            if (startingIndex >= tasks.length && tasks.length > 0) {
+                setScreen('result');
+            } else {
+                setScreen('game');
+            }
         } catch (error) { setScreen('menu'); }
     };
+    
     const handleAnswer = (isCorrect: boolean, answerValue: any) => {
         if (feedback !== 'none' || connectionStatus === 'reconnecting') return;
 
@@ -293,34 +316,11 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         }
     };
 
-    // --- RANDARE ECRANE ---
 
-    if (screen === 'menu') return (
-        <div style={styles.container}>
-            <div style={{ textAlign: 'center', color: 'white' }}>
-                <h1 style={{ fontSize: '3rem', marginBottom: '10px', fontWeight: 900 }}>OPÉRATION CROISSANT 🥐</h1>
-                <p style={{ fontSize: '1.2rem', marginBottom: '40px', opacity: 0.8 }}>Agent, infiltrați-vă în Paris și colectați informații prin limbaj.</p>
-                <div style={styles.menuGridWrapper}>
-                    <img src={menuBg} alt="Meniu" style={styles.menuImage} />
-                    <div style={styles.gridOverlay}>
-                        {levels.length > 0 && (
-                            <div style={styles.gridCellActive} onClick={() => startLevel(levels[0].id)}>
-                                <span style={styles.playBadge}>START MISIUNE</span>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{levels[0].title}</span>
-                            </div>
-                        )}
-                        {[...Array(8)].map((_, i) => (
-                            <div key={i} style={styles.gridCellLocked}>CLASSIFIED</div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 
     if (screen === 'loading') return (
         <div style={styles.container}>
-            <div style={styles.centerText}>🇫🇷 ENCRYPTING CONNECTION...</div>
+            <div style={styles.centerText}>ENCRYPTING CONNECTION...</div>
         </div>
     );
 
@@ -329,7 +329,6 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
         return (
             <div style={{ ...styles.container, position: 'relative' }}>
 
-                {/* MODAL RECONECTARE */}
                 {connectionStatus === 'reconnecting' && (
                     <div style={{
                         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -372,6 +371,15 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
                                 ETAPA <span style={{ color: '#fff' }}>{currentTaskIndex + 1}</span> / {currentTasks.length}
                             </div>
                         </div>
+                        <button onClick={() => {
+                            if (window.confirm("Voulez-vous quitter? Progresul e salvat.")) {
+                                localStorage.removeItem('robot_active_session');
+                                localStorage.removeItem('robot_student_code');
+                                window.location.reload();
+                            }
+                        }} style={{ marginLeft: '20px', padding: '6px 14px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                            QUITTER
+                        </button>
                     </div>
 
                     <div style={styles.mainGameArea}>
@@ -393,14 +401,14 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
 
                             {feedback === 'correct' && (
                                 <div style={styles.feedbackCorrect}>
-                                    <div>INTELLIGENCE VALIDATED</div>
+                                    <div>RENSEIGNEMENTS VALIDÉS</div>
                                     <div style={{ fontSize: '1.2rem', marginTop: '10px', fontWeight: '400' }}>BON TRAVAIL, AGENT.</div>
                                 </div>
                             )}
                             {feedback === 'wrong' && (
                                 <div style={styles.feedbackWrong}>
-                                    <div>COVER COMPROMISED</div>
-                                    <div style={{ fontSize: '1.2rem', marginTop: '10px', fontWeight: '400' }}>RETRY PROTOCOL.</div>
+                                    <div>COUVERTURE COMPROMISE</div>
+                                    <div style={{ fontSize: '1.2rem', marginTop: '10px', fontWeight: '400' }}>PROTOCOLE DE RÉESSAI.</div>
                                 </div>
                             )}
                         </div>
@@ -465,7 +473,7 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
                                             boxShadow: hasErrorOnTask ? '0 4px 12px rgba(244, 63, 94, 0.3)' : 'none'
                                         }}
                                     >
-                                        REQUEST BACKUP
+                                        DEMANDER DES RENFORTS
                                     </button>
                                 </div>
 
@@ -507,7 +515,6 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
     }
 
     if (screen === 'result') {
-        // Tragem o salvă masivă de confetti când se încarcă ecranul final
         setTimeout(() => {
             confetti({
                 particleCount: 400,
@@ -524,11 +531,15 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
                     background: 'white', padding: '60px', borderRadius: '30px',
                     textAlign: 'center', border: '10px solid #f59e0b', boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
                 }}>
-                    <h1 style={{ fontSize: '3.5rem', color: '#1e293b', fontWeight: 900 }}>MISSION ACCOMPLISHED 🏅</h1>
+                    <h1 style={{ fontSize: '3.5rem', color: '#1e293b', fontWeight: 900 }}>Mission réussie ! 🏅</h1>
                     <p style={{ fontSize: '1.3rem', color: '#64748b', marginBottom: '30px' }}>Ați asigurat toate datele pentru Comandament. Alarma a fost dezactivată!</p>
                     <div style={{ fontSize: '6rem', fontWeight: 900, color: '#f59e0b', marginBottom: '40px' }}>{score}</div>
                     <button
-                        onClick={() => window.location.reload()}
+                        onClick={() => {
+                            localStorage.removeItem('robot_active_session');
+                            localStorage.removeItem('robot_student_code');
+                            window.location.reload();
+                        }}
                         style={{
                             padding: '18px 50px', background: '#1e293b', color: 'white',
                             border: 'none', borderRadius: '50px', fontWeight: 'bold',

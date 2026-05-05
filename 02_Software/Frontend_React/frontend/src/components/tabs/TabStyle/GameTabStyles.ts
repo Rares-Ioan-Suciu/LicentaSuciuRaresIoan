@@ -1,8 +1,8 @@
 export const gtStyles: any = {
     wrapper: {
-        padding: '20px 2%', // Padding mai fin pentru a lăsa spațiu lateral cardurilor
-        maxWidth: '96%',     // AM SCHIMBAT AICI: Ocupă 96% din lățimea ecranului!
-        width: '100%',       // Forțează expandarea
+        padding: '20px 2%',
+        maxWidth: '96%',     
+        width: '100%',
         boxSizing: 'border-box',
         margin: '0 auto',
         fontFamily: "'Inter', 'Segoe UI', sans-serif",
@@ -70,7 +70,7 @@ export const gtStyles: any = {
         marginBottom: '40px',
         boxShadow: '0 10px 15px -3px rgba(30, 64, 175, 0.3)',
         borderBottom: '4px solid #1e3a8a',
-        width: '100%', // Asigură-te că bara se întinde și ea la fel ca grila
+        width: '100%', 
         boxSizing: 'border-box'
     },
 
