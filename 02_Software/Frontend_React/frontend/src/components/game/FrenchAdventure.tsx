@@ -366,9 +366,9 @@ const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => 
                             <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>INTEL GATHERED:</span> {score}
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Fază Misiune</div>
+                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Mission state</div>
                             <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#fcd34d' }}>
-                                ETAPA <span style={{ color: '#fff' }}>{currentTaskIndex + 1}</span> / {currentTasks.length}
+                                State <span style={{ color: '#fff' }}>{currentTaskIndex + 1}</span> / {currentTasks.length}
                             </div>
                         </div>
                         <button onClick={() => {

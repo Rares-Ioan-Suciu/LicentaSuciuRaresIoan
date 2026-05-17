@@ -94,7 +94,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ data, totalTasks, onAction, i
                                         onClick={() => onAction('AI_DELEGATE')}
                                         style={{ ...localStyles.btn, flex: 1, background: isPending ? '#94a3b8' : '#6366f1' }}
                                     >
-                                        Delegare AI
+                                        Delegare IA
                                     </button>
                                     <button
                                         disabled={isPending}

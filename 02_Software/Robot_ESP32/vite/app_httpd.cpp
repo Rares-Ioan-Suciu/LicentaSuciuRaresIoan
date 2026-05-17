@@ -19,7 +19,7 @@ typedef struct {
         size_t index;
         size_t count;
         int sum;
-        int * values;
+        int * values; 
 } ra_filter_t;
 
 typedef struct {
@@ -133,7 +133,7 @@ static esp_err_t stream_handler(httpd_req_t *req){
         }
         if(res == ESP_OK){ res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len); }
         if(res == ESP_OK){ res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY)); }
-
+        
         if(fb){
             esp_camera_fb_return(fb);
             fb = NULL;
@@ -143,7 +143,7 @@ static esp_err_t stream_handler(httpd_req_t *req){
             _jpg_buf = NULL;
         }
         if(res != ESP_OK){ break; }
-
+        
         int64_t fr_end = esp_timer_get_time();
         int64_t frame_time = fr_end - last_frame;
         last_frame = fr_end;
@@ -225,7 +225,7 @@ static esp_err_t status_handler(httpd_req_t *req){
 static esp_err_t ping_handler(httpd_req_t *req){
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-
+    
     if (obstacleWarning) {
         return httpd_resp_send(req, "OBSTACLE", 8);
     }
@@ -242,10 +242,10 @@ static esp_err_t autopilot_handler(httpd_req_t *req){
         }
         free(buf);
     }
-
+    
     isAutoPilot = (atoi(state_str) == 1);
-    if (!isAutoPilot) { obstacleWarning = false; }
-
+    if (!isAutoPilot) { obstacleWarning = false; } 
+    
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, "OK", 2);
@@ -256,7 +256,7 @@ static esp_err_t joystick_handler(httpd_req_t *req){
     size_t buf_len;
     char left_str[32] = {0,};
     char right_str[32] = {0,};
-
+    
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1) {
         buf = (char*)malloc(buf_len);
@@ -266,10 +266,10 @@ static esp_err_t joystick_handler(httpd_req_t *req){
         }
         free(buf);
     }
-
-    WheelAct_PWM(atoi(left_str), atoi(right_str));
+    
+    WheelAct_PWM(atoi(left_str), atoi(right_str)); 
     ultimulMesaj = millis();
-
+    
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, "OK", 2);
@@ -279,7 +279,7 @@ static esp_err_t emote_handler(httpd_req_t *req){
     char* buf;
     size_t buf_len;
     char id_str[32] = {0,};
-
+    
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1) {
         buf = (char*)malloc(buf_len);
@@ -288,10 +288,10 @@ static esp_err_t emote_handler(httpd_req_t *req){
         }
         free(buf);
     }
-
-    activeEmote = atoi(id_str);
-    ultimulMesaj = millis();
-
+    
+    activeEmote = atoi(id_str); 
+    ultimulMesaj = millis(); 
+    
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     return httpd_resp_send(req, "OK", 2);
@@ -299,13 +299,13 @@ static esp_err_t emote_handler(httpd_req_t *req){
 
 void startCameraServer(){
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 15;
+    config.max_uri_handlers = 10; // Am redus și aici limita pentru eficiență
 
     httpd_uri_t status_uri = { .uri = "/status", .method = HTTP_GET, .handler = status_handler, .user_ctx = NULL };
     httpd_uri_t cmd_uri = { .uri = "/control", .method = HTTP_GET, .handler = cmd_handler, .user_ctx = NULL };
     httpd_uri_t capture_uri = { .uri = "/capture", .method = HTTP_GET, .handler = capture_handler, .user_ctx = NULL };
     httpd_uri_t stream_uri = { .uri = "/stream", .method = HTTP_GET, .handler = stream_handler, .user_ctx = NULL };
-
+    
     httpd_uri_t ping_uri = { .uri = "/ping", .method = HTTP_GET, .handler = ping_handler, .user_ctx = NULL };
     httpd_uri_t joystick_uri = { .uri = "/joystick", .method = HTTP_GET, .handler = joystick_handler, .user_ctx = NULL };
     httpd_uri_t emote_uri = { .uri = "/emote", .method = HTTP_GET, .handler = emote_handler, .user_ctx = NULL };

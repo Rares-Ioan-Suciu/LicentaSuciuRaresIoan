@@ -66,7 +66,6 @@ export default function TeacherDashboard() {
             Gestionare Cursuri
           </button>
 
-          {/* --- NOU: Buton acces general Robot --- */}
           <button
             onClick={() => window.open('/robot', '_blank')}
             style={{
