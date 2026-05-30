@@ -201,7 +201,7 @@ export const RobotTab: React.FC = () => {
                 </button>
 
                 <button onClick={handleCapture} style={{ ...actionBtnStyle, flex: 1, padding: '15px', fontSize: '14px', backgroundColor: '#3b82f6', letterSpacing: '1px' }}>
-                  FOTO HD
+                  FOTO
                 </button>
               </div>
 

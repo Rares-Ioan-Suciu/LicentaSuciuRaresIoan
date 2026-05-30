@@ -116,7 +116,7 @@ public class A_CSLevelInitializer {
                     Map.of("options", List.of("6", "10", "12", "5"), "correctAnswer", "12", "svgContent", svgG1), mapper));
 
             tasks.add(createTask(infoLevel, 2, TaskType.MultipleChoice,
-                    "Care este gradul MINIM (δ(G)) al serverelor din Sectorul G1?",
+                    "Care este nodul cu grad MINIM (δ(G)) al serverelor din Sectorul G1?",
                     "Gradul minim reprezintă nodul cu cele mai puține legături. Caută nodurile marginale.",
                     Map.of("options", List.of("5", "2", "3", "4"), "correctAnswer", "5", "svgContent", svgG1), mapper));
 
