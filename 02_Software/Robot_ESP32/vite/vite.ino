@@ -170,7 +170,7 @@ void loop() {
     if (distFata > 0 && distFata < 20) {
       obstacleWarning = true;      
       WheelAct_PWM(0, 0); delay(200);
-      bip(200, 0); // Sunet "Aoleu, perete!"
+      bip(200, 0); 
       int distSpate = masoaraDistanta(ECHO_SPATE);
       if (distSpate == 0 || distSpate > 15) {
         WheelAct_PWM(-150, -150); delay(400); 
@@ -188,7 +188,6 @@ void loop() {
       
       WheelAct_PWM(0, 0); delay(200);
     } else {
-      // DRUM LIBER
       obstacleWarning = false;
       WheelAct_PWM(130, 130); delay(50);
     }

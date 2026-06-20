@@ -6,6 +6,7 @@ import StudentNavbar from '../components/StudentNavbar';
 import StreamTab from '../components/tabs/StreamTab';
 import PeopleTab from '../components/tabs/PeopleTab';
 import GameTab from '../components/tabs/GameTab';
+import { APP_CONFIG } from '../config';
 
 interface ClassroomData {
     id: number;
@@ -25,7 +26,7 @@ const ClassDetails = () => {
 
     const fetchData = async () => {
         try {
-            const res = await fetch(`http://192.168.1.13:8080/api/v1/classes/${id}`, {
+            const res = await fetch(`${APP_CONFIG.API_BASE_URL}/api/v1/classes/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -35,7 +36,7 @@ const ClassDetails = () => {
                 data.announcements.reverse();
                 setClassroom(data);
             }
-            const resStudents = await fetch(`http://192.168.1.13:8080/api/v1/classes/${id}/students`, {
+            const resStudents = await fetch(`${APP_CONFIG.API_BASE_URL}/api/v1/classes/${id}/students`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (resStudents.ok) {
@@ -53,7 +54,7 @@ const ClassDetails = () => {
 
     const handlePost = async (content: string) => {
         if (!content) return;
-        await fetch(`http://192.168.1.13:8080/api/v1/classes/${id}/announcements`, {
+        await fetch(`${APP_CONFIG.API_BASE_URL}/api/v1/classes/${id}/announcements`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ content })
@@ -63,7 +64,7 @@ const ClassDetails = () => {
 
     const handleInvite = async (email: string) => {
         if (!email) return;
-        const res = await fetch(`http://192.168.1.13:8080/api/v1/classes/${id}/invite`, {
+        const res = await fetch(`${APP_CONFIG.API_BASE_URL}/api/v1/classes/${id}/invite`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ email })
@@ -117,8 +118,8 @@ const ClassDetails = () => {
 
             <div style={{
                 ...styles.mainContent,
-                maxWidth: activeTab === 'game' ? '100%' : '1000px', 
-                padding: activeTab === 'game' ? '0' : '30px 20px'  
+                maxWidth: activeTab === 'game' ? '100%' : '1000px',
+                padding: activeTab === 'game' ? '0' : '30px 20px'
             }}>
                 {activeTab === 'stream' && (
                     <StreamTab

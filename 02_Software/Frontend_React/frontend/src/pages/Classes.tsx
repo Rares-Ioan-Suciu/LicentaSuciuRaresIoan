@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TeacherNavbar from '../components/TeacherNavbar';
 import StudentNavbar from '../components/StudentNavbar';
 import useCurrentUser from '../hooks/useCurrentUser';
+import { APP_CONFIG } from '../config';
 
 interface Classroom {
   id: string;
@@ -20,7 +21,7 @@ const Classes = () => {
 
   const fetchClasses = async () => {
     try {
-      const res = await fetch("http://192.168.1.13:8080/api/v1/classes", {
+      const res = await fetch(`${APP_CONFIG.API_BASE_URL}/api/v1/classes`, {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       if (res.ok) {
@@ -44,7 +45,7 @@ const Classes = () => {
     const desc = prompt("Descriere (optional):") || "";
 
     try {
-      const res = await fetch('http://192.168.1.13:8080/api/v1/classes', {
+      const res = await fetch(`${APP_CONFIG.API_BASE_URL}/api/v1/classes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

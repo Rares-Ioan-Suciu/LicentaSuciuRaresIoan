@@ -28,7 +28,6 @@ public class OpenAIService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         String systemPrompt;
-        String userMessage;
 
         if ("fr".equals(language)) {
             systemPrompt = """
@@ -42,7 +41,7 @@ public class OpenAIService {
                     4. FII CONCIS: Maxim 35-40 de cuvinte în total.
                     5. FĂRĂ RĂSPUNSURI MURĂ-N GURĂ: Dă-i un indiciu logic ca să descopere singur soluția, nu-i oferi răspunsul final.
                     6. MEMORIE (ISTORIC INDICII): Verifică mereu ce i s-a mai zis. NU repeta sfaturi trecute, vino cu o abordare NOUĂ.
-                    7.NU LE DA NICIODATA RASPUNSUL CORECT DIRECT.
+                    7. NU LE DA NICIODATĂ RĂSPUNSUL CORECT DIRECT.
                     """;
         } else {
             systemPrompt = """
@@ -56,11 +55,11 @@ public class OpenAIService {
                     4. FII CONCIS: Maxim 35-40 de cuvinte în total.
                     5. FĂRĂ RĂSPUNSURI MURĂ-N GURĂ: Ghidează-l spre pasul corect din algoritm, fără să îi scrii tu rezolvarea.
                     6. MEMORIE (ISTORIC INDICII): Verifică mereu ce i s-a mai zis. NU repeta sfaturi trecute, explică-i dintr-un unghi NOU.
-                     7.NU LE DA NICIODATA RASPUNSUL CORECT DIRECT.
+                    7. NU LE DA NICIODATĂ RĂSPUNSUL CORECT DIRECT.
                     """;
         }
 
-        userMessage = String.format(
+        String userMessage = String.format(
                 "CONTEXT EXERCIȚIU:\n%s\n\nISTORIC INDICII DEJA OFERITE:\n%s\n\nGenerează indiciul exact conform regulilor:",
                 studentContext, (history != null && !history.isBlank()) ? history : "Niciun istoric."
         );
@@ -71,7 +70,6 @@ public class OpenAIService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userMessage)
         ));
-
         requestBody.put("temperature", 0.4);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
@@ -80,10 +78,10 @@ public class OpenAIService {
             ResponseEntity<Map> response = restTemplate.postForEntity(ENDPOINT, entity, Map.class);
             return extractContentFromResponse(response.getBody());
         } catch (Exception e) {
-            System.err.println("[OpenAI Error] " + e.getMessage());
+            System.err.println("[OpenAIService] Fail la generare hint: " + e.getMessage());
             return "fr".equals(language) ?
-                    "Erreur de réseau, veuillez réessayer. | Eroare de rețea, te rog să mai încerci." :
-                    "Eroare de rețea. Te rog verifică din nou exercițiul și mai încearcă.";
+                    "Erreur de connexion. | O mică problemă de rețea. Te rog să mai încerci o dată!" :
+                    "O mică problemă de rețea. Analizează încă o dată exercițiul și mai încearcă!";
         }
     }
 

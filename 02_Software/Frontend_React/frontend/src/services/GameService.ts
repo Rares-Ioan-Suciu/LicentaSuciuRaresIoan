@@ -1,27 +1,37 @@
-import axios from 'axios'; 
+import axios from 'axios';
 import type { GameTask, GameLevel } from '../types/game';
+import { APP_CONFIG } from '../config';
 
-const BASE_URL = 'http://192.168.1.13:8080/api/game';
+const GAME_API = `${APP_CONFIG.API_BASE_URL}/api/game`;
 
 export const GameService = {
     getAllLevels: async (): Promise<GameLevel[]> => {
-        const response = await axios.get(`${BASE_URL}/levels`);
-        return response.data;
+        try {
+            const { data } = await axios.get(`${GAME_API}/levels`);
+            return data;
+        } catch (err) {
+            console.log("nu a mers sa iau nivelele", err);
+            throw new Error("Eroare la incarcare nivele");
+        }
     },
 
     getLevelTasks: async (levelId: number): Promise<GameTask[]> => {
-        const response = await axios.get(`${BASE_URL}/levels/${levelId}/tasks`);
+        try {
+            const { data } = await axios.get(`${GAME_API}/levels/${levelId}/tasks`);
 
-        return response.data.map((task: any) => {
-            try {
-                return {
-                    ...task,
-                    parsedData: typeof task.taskData === 'string' ? JSON.parse(task.taskData) : task.taskData
-                };
-            } catch (e) {
-                console.error("Eroare parsare date task:", task.id);
-                return task;
-            }
-        });
+            return data.map((task: any) => {
+                try {
+                    return {
+                        ...task,
+                        parsedData: typeof task.taskData === 'string' ? JSON.parse(task.taskData) : task.taskData
+                    };
+                } catch (e) {
+                    console.log("eroare parsare json la task", task.id);
+                    return task;
+                }
+            });
+        } catch (err) {
+            throw err;
+        }
     }
 };

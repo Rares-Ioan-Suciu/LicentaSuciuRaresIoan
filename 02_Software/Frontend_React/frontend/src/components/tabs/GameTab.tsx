@@ -4,204 +4,40 @@ import AlgorithmAdventure from '../game/AlgorithmAdventure';
 import { TeacherService } from '../../services/TeacherService';
 import LiveMonitorGrid from './LiveMonitorGrid';
 import { gtStyles as s } from './TabStyle/GameTabStyles';
+import { APP_CONFIG } from '../../config';
+import { useGameManager } from '../../hooks/useGameManager';
 
 interface GameTabProps { isTeacher: boolean; }
 
-interface SessionData {
-    sessionId: number;
-    name: string;
-    levelTitle?: string;
-    levelId?: number;
-}
-
 const GameTab = ({ isTeacher }: GameTabProps) => {
 
-    const [gameState, setGameState] = useState<'idle' | 'lobby' | 'running'>(() => {
-        return (localStorage.getItem('robot_game_state') as any) || 'idle';
-    });
+    const {
+        gameState, setGameState,
+        sessionInfo, setSessionInfo,
+        activeSession, setActiveSession,
+        studentCode, setStudentCode,
+        studentName, setStudentName,
+        students, setStudents,
+        socket
+    } = useGameManager(isTeacher);
 
-    const [sessionInfo, setSessionInfo] = useState<{ id: number, accessCode: string } | null>(() => {
-        const saved = localStorage.getItem('robot_session_info');
-        return saved ? JSON.parse(saved) : null;
-    });
 
-    const [activeSession, setActiveSession] = useState<SessionData | null>(() => {
-        const saved = localStorage.getItem('robot_active_session');
-        return saved ? JSON.parse(saved) : null;
-    });
-
-    const [studentCode, setStudentCode] = useState(() => {
-        return localStorage.getItem('robot_student_code') || "";
-    });
-
-    const [students, setStudents] = useState<Record<string, any>>({});
-    const [socket, setSocket] = useState<WebSocket | null>(null);
     const [broadcastText, setBroadcastText] = useState("");
     const [selectedLevelId, setSelectedLevelId] = useState<number>(2);
-    const [studentName, setStudentName] = useState("");
-    const [activePin, setActivePin] = useState<string | null>(null);
     const [pendingActions, setPendingActions] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
-        const savedMagicCode = localStorage.getItem('magic_join_code');
-
-        if (savedMagicCode && !isTeacher) {
-            setStudentCode(savedMagicCode.toUpperCase());
-            localStorage.removeItem('magic_join_code');
-        }
-    }, [isTeacher]);
-
-    useEffect(() => {
-        try {
-            const token = localStorage.getItem('token');
-            if (token && !isTeacher) {
-                const base64Url = token.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-
-                const payload = JSON.parse(jsonPayload);
-                if (payload.full_name) {
-                    setStudentName(payload.full_name);
-                }
-            }
-        } catch (e) {
-            console.log("Nu am putut extrage numele din token", e);
-        }
-    }, [isTeacher]);
-
-    useEffect(() => {
-        if (sessionInfo) localStorage.setItem('robot_session_info', JSON.stringify(sessionInfo));
-        if (gameState) localStorage.setItem('robot_game_state', gameState);
-
-        if (activeSession) {
-            localStorage.setItem('robot_active_session', JSON.stringify(activeSession));
-            localStorage.setItem('robot_student_code', studentCode);
-        } else if (gameState === 'idle') {
-            localStorage.removeItem('robot_active_session');
-            localStorage.removeItem('robot_student_code');
-        }
-    }, [sessionInfo, gameState, activeSession, studentCode]);
-
-    useEffect(() => {
-        if (isTeacher && sessionInfo && gameState === 'running') {
-            const fetchExistingStudents = async () => {
-                try {
-                    const res = await fetch(`http://192.168.1.13:8080/api/sessions/${sessionInfo.id}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.students && data.students.length > 0) {
-                            const studentsMap: Record<string, any> = {};
-                            data.students.forEach((s: any) => {
-                                studentsMap[s.studentName] = s;
-                            });
-                            setStudents(studentsMap);
-                        }
-                    }
-                } catch (e) {
-                    console.error("Nu am putut recupera lista de elevi din DB:", e);
-                }
-            };
-            fetchExistingStudents();
-        }
-    }, [isTeacher, sessionInfo, gameState]);
-
-    useEffect(() => {
         if (s.injectGlobalStyles) s.injectGlobalStyles();
-
-        const canConnect = (isTeacher && sessionInfo && (gameState === 'lobby' || gameState === 'running')) ||
-            (!isTeacher && activeSession);
-
-        if (canConnect) {
-            const ws = new WebSocket("ws://192.168.1.13:8080/ws_game");
-
-            ws.onopen = () => {
-                console.log("WebSocket activat pentru:", isTeacher ? "PROFESOR" : "ELEV");
-                ws.send(JSON.stringify({
-                    type: "JOIN",
-                    role: isTeacher ? "TEACHER" : "STUDENT",
-                    username: isTeacher ? "teacher" : studentName,
-                    accessCode: isTeacher ? sessionInfo?.accessCode : studentCode
-                }));
-            };
-
-            ws.onmessage = (e) => {
-                const msg = JSON.parse(e.data);
-
-                if (isTeacher) {
-                    if (msg.type === "STUDENT_JOINED" || msg.type === "STUDENT_UPDATE" || msg.type === "STUDENT_NEEDS_HELP") {
-
-                        if (msg.type === "STUDENT_NEEDS_HELP" || (msg.type === "STUDENT_UPDATE" && msg.data.helpStatus === 'PENDING')) {
-                            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-                            audio.volume = 0.5;
-                            audio.play().catch(err => console.warn("Sunetul a fost blocat de browser:", err));
-                        }
-
-                        setStudents(prev => {
-                            const oldStudent = prev[msg.data.studentName] || {};
-                            const newStudent = { ...oldStudent, ...msg.data };
-
-                          
-                            if (msg.type === "STUDENT_NEEDS_HELP") {
-                                newStudent.responded = false; 
-                            } else if (newStudent.helpStatus !== 'PENDING') {
-                                newStudent.responded = false; 
-                            } else if (oldStudent.responded && newStudent.errorCount > (oldStudent.respondedErrorCount ?? -1)) {
-                                newStudent.responded = false; 
-                            } else if (newStudent.currentTaskIndex > (oldStudent.currentTaskIndex ?? -1)) {
-                                newStudent.responded = false; 
-                            }
-
-                            return { ...prev, [msg.data.studentName]: newStudent };
-                        });
-                    }
-                    else if (msg.type === "AI_HINT_GENERATED") {
-                        setStudents(prev => {
-                            const studentToUpdate = prev[msg.data.studentName];
-                            if (!studentToUpdate) return prev;
-                            return {
-                                ...prev,
-                                [msg.data.studentName]: {
-                                    ...studentToUpdate,
-                                    aiHintHistory: (studentToUpdate.aiHintHistory ? studentToUpdate.aiHintHistory + " | " : "") + msg.data.hint
-                                }
-                            };
-                        });
-                    }
-                    else if (msg.type === "ROBOT_ENGAGED") {
-                        setStudents(prev => ({
-                            ...prev,
-                            [msg.studentName]: { ...prev[msg.studentName], needsHelp: false, helpStatus: 'RESOLVED', responded: false }
-                        }));
-                    }
-                } else {
-                    if (msg.type === "BROADCAST_PIN") {
-                        setActivePin(msg.text);
-                    }
-                    else if (msg.type === "SESSION_TERMINATED") {
-                        localStorage.clear();
-                        setActiveSession(null);
-                        setGameState('idle');
-                        alert("Profesorul a închis sesiunea. Vei fi trimis la meniul principal.");
-                        window.location.reload();
-                    }
-                }
-            };
-
-            setSocket(ws);
-            return () => {
-                if (ws.readyState === WebSocket.OPEN) ws.close();
-            };
-        }
-    }, [isTeacher, sessionInfo, gameState, activeSession, studentName, studentCode]);
+    }, []);
 
     const handleCreateSession = async () => {
         try {
             const data = await TeacherService.createSession(selectedLevelId, "Profesor_Principal");
             setSessionInfo({ id: data.id, accessCode: data.accessCode });
             setGameState('lobby');
-        } catch (e) { alert("Eroare la pornirea sesiunii!"); }
+        } catch (e) {
+            alert("Eroare la pornirea sesiunii!");
+        }
     };
 
     const handleTerminate = async () => {
@@ -213,7 +49,6 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                 setGameState('idle');
                 setSessionInfo(null);
                 setStudents({});
-                setSocket(null);
                 setPendingActions({});
                 alert("Sesiune închisă cu succes!");
             } catch (e) {
@@ -300,15 +135,14 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                 textForStudent = reply;
             }
 
-           
             const errorDetailsJSON = students[studentName]?.lastErrorDetails || "{}";
 
             const payload = {
                 type: type,
                 studentName: studentName,
                 accessCode: sessionInfo.accessCode,
-                message: textForStudent, 
-                details: errorDetailsJSON, 
+                message: textForStudent,
+                details: errorDetailsJSON,
                 task: "Exercițiu curent",
                 sessionId: sessionInfo.id
             };
@@ -318,7 +152,7 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
             clearPending(800);
         } else {
             setPendingActions(prev => ({ ...prev, [studentName]: false }));
-            console.error("Conexiune WebSocket indisponibilă!");
+            console.log("ws indisponibil pt actiune");
         }
     };
 
@@ -326,12 +160,12 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
         try {
             setActiveSession(null);
 
-            const joinUrl = `http://192.168.1.13:8080/api/sessions/join?code=${studentCode}&name=${studentName}`;
+            const joinUrl = `${APP_CONFIG.API_BASE_URL}/api/sessions/join?code=${studentCode}&name=${studentName}`;
             const joinResponse = await fetch(joinUrl, { method: 'POST' });
             if (!joinResponse.ok) throw new Error("Cod invalid");
             const progressData = await joinResponse.json();
 
-            const sessionUrl = `http://192.168.1.13:8080/api/sessions/${progressData.sessionId}`;
+            const sessionUrl = `${APP_CONFIG.API_BASE_URL}/api/sessions/${progressData.sessionId}`;
             const sessionResponse = await fetch(sessionUrl);
             if (!sessionResponse.ok) throw new Error("Nu am putut recupera detaliile sesiunii");
             const sessionDetails = await sessionResponse.json();
@@ -339,7 +173,7 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
             const titleFromDB = sessionDetails.gameLevel?.title || "La Boulangerie";
             const idFromDB = sessionDetails.gameLevel?.id || 1;
 
-            const sessionData: SessionData = {
+            const sessionData = {
                 sessionId: progressData.sessionId,
                 name: studentName,
                 levelTitle: titleFromDB,
@@ -420,7 +254,7 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
                             />
                             <button
                                 onClick={() => {
-                                    navigator.clipboard.writeText(`http://192.168.1.13:5173/login?join=${sessionInfo.accessCode}`);
+                                    navigator.clipboard.writeText(`${window.location.origin}/login?join=${sessionInfo.accessCode}`);
                                     alert("Link-ul a fost copiat! Trimite-l elevilor.");
                                 }}
                                 style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}

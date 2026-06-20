@@ -3,6 +3,8 @@ package ro.uvt.licenta.robot_backend.server.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,6 +17,7 @@ import ro.uvt.licenta.robot_backend.server.service.OpenAIService;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class GameSocketHandler extends TextWebSocketHandler {
@@ -22,16 +25,19 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final GameSessionService gameSessionService;
     private final OpenAIService openAIService;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String ESP32_IP = "192.168.1.7";
+
+    @Value("${app.robot.ip:192.168.1.7}")
+    private String esp32Ip;
 
     private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
 
     private volatile String stationedStudent = null;
     private volatile String stationedAccessCode = null;
     private volatile String stationedLanguage = "ro";
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        System.out.println("SERVER A PRIMIT: " + message.getPayload());
+        log.info("SERVER A PRIMIT: {}", message.getPayload());
         JsonNode json = objectMapper.readTree(message.getPayload());
         String type = json.get("type").asText();
 
@@ -144,9 +150,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
                     "message", hint,
                     "lang", limba.equals("fr") ? "fr-FR" : "ro-RO"
             ));
-            System.out.println("[ROBOT] Robotul este la elev, așa că rostește sfatul cu voce tare.");
+            log.info("[ROBOT] Robotul este la elev, așa că rostește sfatul cu voce tare.");
         } else {
-            System.out.println("[ROBOT] Sfat trimis doar text. Robotul nu este delegat fizic la acest elev.");
+            log.info("[ROBOT] Sfat trimis doar text. Robotul nu este delegat fizic la acest elev.");
         }
     }
 
@@ -164,11 +170,10 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
 
         if (studentName.equals(stationedStudent) && code.equals(stationedAccessCode)) {
-            System.out.println("[ROBOT] Elevul mentorat a greșit! Cer un nou sfat AI.");
+            log.info("[ROBOT] Elevul mentorat a greșit! Cer un nou sfat AI.");
 
-            triggerESP32Emote(2); // Declanșează eșec pe mașinuță
+            triggerESP32Emote(2);
 
-            // Reacționează în limba potrivită materiei
             String oopsMessage = stationedLanguage.equals("fr")
                     ? "Oh non, ce n'est pas ça ! Laisse-moi chercher un autre indice..."
                     : "Of, nu e chiar așa! Lasă-mă să mă gândesc la alt indiciu...";
@@ -194,11 +199,10 @@ public class GameSocketHandler extends TextWebSocketHandler {
         notifyTeacher(accessCode, "STUDENT_UPDATE", updated);
 
         if (studentName.equals(stationedStudent) && accessCode.equals(stationedAccessCode)) {
-            System.out.println("[ROBOT] Elevul mentorat a reușit! Eliberez robotul.");
+            log.info("[ROBOT] Elevul mentorat a reușit! Eliberez robotul.");
 
-            triggerESP32Emote(1); // Declanșează victorie pe mașinuță
+            triggerESP32Emote(1);
 
-            // Felicită elevul în limba potrivită materiei
             String bravoMessage = stationedLanguage.equals("fr")
                     ? "Excellent ! Réponse parfaite ! Mission accomplie, je rentre à la base."
                     : "Excelent! Răspuns perfect! Misiune îndeplinită, mă întorc la bază.";
@@ -212,7 +216,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
             stationedStudent = null;
             stationedAccessCode = null;
-            stationedLanguage = "ro"; // reset
+            stationedLanguage = "ro";
         }
     }
 
@@ -236,7 +240,9 @@ public class GameSocketHandler extends TextWebSocketHandler {
                                 "text", message
                         ))));
                     }
-                } catch (Exception e) { e.printStackTrace(); }
+                } catch (Exception e) {
+                    log.error("Eroare la broadcast", e);
+                }
             }
         });
     }
@@ -290,7 +296,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
         try{
             String payload = objectMapper.writeValueAsString(terminateMessage);
-            System.out.println(" Încep broadcast pentru codul: " + accessCode);
+            log.info(" Încep broadcast pentru codul: {}", accessCode);
 
             userSessions.forEach((key, session) ->{
                 if(key.startsWith(accessCode + "_") && session.isOpen()) {
@@ -299,12 +305,12 @@ public class GameSocketHandler extends TextWebSocketHandler {
                             session.sendMessage(new TextMessage(payload));
                         }
                     } catch (Exception e) {
-                        System.err.println("Eroare la trimitere");
+                        log.error("Eroare la trimitere terminare", e);
                     }
                 }
             });
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Eroare construire payload", e);
         }
     }
 
@@ -316,15 +322,15 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private void triggerESP32Emote(int emoteId) {
         new Thread(() -> {
             try {
-                String url = "http://" + ESP32_IP + "/emote?id=" + emoteId;
-                System.out.println("[ESP32 FETCH] Trimit comanda către: " + url);
+                String url = "http://" + esp32Ip + "/emote?id=" + emoteId;
+                log.info("[ESP32 FETCH] Trimit comanda către: {}", url);
 
                 org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
                 String response = restTemplate.getForObject(url, String.class);
 
-                System.out.println("[ESP32 SUCCESS] Robotul a dansat! Răspuns: " + response);
+                log.info("[ESP32 SUCCESS] Robotul a reactionat! Răspuns: {}", response);
             } catch (Exception e) {
-                System.err.println("[ESP32 ERROR] Nu am putut mișca robotul: " + e.getMessage());
+                log.error("[ESP32 ERROR] Nu am putut comunica cu robotul: {}", e.getMessage());
             }
         }).start();
     }

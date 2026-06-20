@@ -299,7 +299,7 @@ static esp_err_t emote_handler(httpd_req_t *req){
 
 void startCameraServer(){
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 10; // Am redus și aici limita pentru eficiență
+    config.max_uri_handlers = 10; 
 
     httpd_uri_t status_uri = { .uri = "/status", .method = HTTP_GET, .handler = status_handler, .user_ctx = NULL };
     httpd_uri_t cmd_uri = { .uri = "/control", .method = HTTP_GET, .handler = cmd_handler, .user_ctx = NULL };

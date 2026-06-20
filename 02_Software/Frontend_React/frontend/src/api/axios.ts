@@ -1,14 +1,11 @@
 import axios from 'axios';
-
+import { APP_CONFIG } from '../config';
 
 const api = axios.create({
-
-    baseURL: "http://192.168.1.13:8080/api",
+    baseURL: `${APP_CONFIG.API_BASE_URL}/api`,
     headers: {
         'Content-Type': 'application/json',
     },
-
 });
-
 
 export default api;

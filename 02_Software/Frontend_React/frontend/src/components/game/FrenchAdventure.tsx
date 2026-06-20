@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { GameService } from '../../services/GameService';
-import type { GameLevel, GameTask } from '../../types/game';
+import React from 'react';
+import type { GameTask } from '../../types/game';
 import { styles } from './AdventureStyles';
 
 import MultipleChoiceTask from './tasks/MultipleChoiceTask';
@@ -15,6 +14,8 @@ import metroBg from '../../assets/bg_metro_station.jpg';
 import louvreBg from '../../assets/bg_louvre_museum.jpg';
 import confetti from 'canvas-confetti';
 
+import { useFrenchAdventure, type SessionContextData } from '../../hooks/useFrenchAdventure';
+
 const imageMap: Record<string, string> = {
     "/assets/bg_bakery_shop.png": bakeryBg,
     "/assets/bg_gendarme_street.jpg": gendarmeBg,
@@ -23,300 +24,25 @@ const imageMap: Record<string, string> = {
 };
 
 interface FrenchAdventureProps {
-    sessionContext?: {
-        sessionId: number;
-        username: string;
-        accessCode: string;
-        levelId?: number;
-    };
+    sessionContext?: SessionContextData;
 }
 
 const FrenchAdventure: React.FC<FrenchAdventureProps> = ({ sessionContext }) => {
-    const [screen, setScreen] = useState<'menu' | 'loading' | 'game' | 'result'>(
-        sessionContext ? 'loading' : 'menu'
-    );
-
-    useEffect(() => {
-        if (sessionContext?.levelId && screen === 'loading') {
-            startLevel(sessionContext.levelId);
-        }
-    }, [sessionContext, screen]);
-    const [levels, setLevels] = useState<GameLevel[]>([]);
-    const [currentTasks, setCurrentTasks] = useState<GameTask[]>([]);
-    const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-    const [score, setScore] = useState(0);
-    const [feedback, setFeedback] = useState<'none' | 'correct' | 'wrong'>('none');
-    const [socket, setSocket] = useState<WebSocket | null>(null);
-    const [hasErrorOnTask, setHasErrorOnTask] = useState(false);
-
-    const [activePin, setActivePin] = useState<string | null>(null);
-    const [aiFeedback, setAiFeedback] = useState<string>("");
-    const [feedbackSource, setFeedbackSource] = useState<'AI' | 'ROBOT' | 'TEACHER' | null>(null);
-
-    const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
-    const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-        const handleOffline = () => {
-            console.warn("Browser-ul a pierdut conexiunea la internet!");
-            setConnectionStatus('reconnecting');
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.close();
-            }
-        };
-
-        const handleOnline = () => {
-            console.log("Internetul a revenit!");
-        };
-
-        window.addEventListener('offline', handleOffline);
-        window.addEventListener('online', handleOnline);
-
-        return () => {
-            window.removeEventListener('offline', handleOffline);
-            window.removeEventListener('online', handleOnline);
-        };
-    }, [socket]);
-
-    useEffect(() => {
-     
-        if (currentTasks.length > 0 && currentTaskIndex === currentTasks.length - 1) {
-            if (socket && socket.readyState === WebSocket.OPEN && sessionContext) {
-                socket.send(JSON.stringify({
-                    type: "SHOW_EXTRACTION_CODE",
-                    code: "7392" 
-                }));
-            }
-        }
-    }, [currentTaskIndex, currentTasks.length, socket, sessionContext]);
-
-    useEffect(() => {
-        const fetchLevelData = async () => {
-            try {
-                const data = await GameService.getAllLevels();
-                if (data && data.length > 0) setLevels(data);
-            } catch (error) { console.error("Eroare nivele:", error); }
-        };
-        fetchLevelData();
-
-        if (!sessionContext) return;
-        let isComponentMounted = true;
-
-        const connectWebSocket = (retryCount = 0) => {
-            if (!isComponentMounted) return;
-
-            const ws = new WebSocket("ws://192.168.1.13:8080/ws_game");
-
-            ws.onopen = () => {
-                if (!isComponentMounted) { ws.close(); return; }
-                console.log("WebSocket Agent conectat!");
-                setConnectionStatus('connected');
-
-                ws.send(JSON.stringify({
-                    type: "JOIN",
-                    role: "STUDENT",
-                    username: sessionContext.username,
-                    accessCode: sessionContext.accessCode
-                }));
-            };
-
-            ws.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-
-                if (data.type === "SESSION_TERMINATED") {
-                    console.log("Misiune întreruptă de Comandament.");
-                    window.location.reload();
-                    ws.close();
-                    return;
-                }
-
-                if (data.type === "BROADCAST_PIN") {
-                    setActivePin(data.text);
-                }
-
-                if (data.type === "ai_feedback") {
-                    setAiFeedback(data.message);
-                    setFeedbackSource('AI');
-                } else if (data.type === "robot_feedback") {
-                    setAiFeedback(data.message);
-                    setFeedbackSource('ROBOT');
-                } else if (data.type === "teacher_reply") {
-                    setAiFeedback(data.message);
-                    setFeedbackSource('TEACHER');
-                }
-            };
-
-            ws.onclose = () => {
-                if (!isComponentMounted) return;
-                console.warn("Legătură pierdută cu HQ. Reconectare...");
-                setConnectionStatus('reconnecting');
-
-                const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
-                reconnectTimeout.current = setTimeout(() => {
-                    connectWebSocket(retryCount + 1);
-                }, timeout);
-            };
-
-            ws.onerror = (err) => {
-                console.error("Eroare de semnal:", err);
-                ws.close();
-            };
-
-            setSocket(ws);
-        };
-
-        connectWebSocket(0);
-
-        return () => {
-            isComponentMounted = false;
-            if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
-            setSocket(prev => {
-                if (prev && prev.readyState === WebSocket.OPEN) prev.close();
-                return null;
-            });
-        };
-    }, [sessionContext]);
-
-    const startLevel = async (levelId: number) => {
-        setScreen('loading');
-        setAiFeedback("");
-        setFeedbackSource(null);
-        try {
-            const tasks = await GameService.getLevelTasks(levelId);
-            setCurrentTasks(tasks);
-
-            let startingIndex = 0;
-            let startingScore = 0;
-            if (sessionContext) {
-                const joinUrl = `http://192.168.1.13:8080/api/sessions/join?code=${sessionContext.accessCode}&name=${sessionContext.username}`;
-                const res = await fetch(joinUrl, { method: 'POST' });
-
-                if (res.ok) {
-                    const progress = await res.json();
-                    startingIndex = progress.currentTaskIndex || 0;
-                    startingScore = progress.score || 0;
-                } else {
-                    alert("Sesiunea a fost închisă sau nu mai este valabilă.");
-                    localStorage.removeItem('robot_active_session');
-                    localStorage.removeItem('robot_student_code');
-                    window.location.reload();
-                    return; 
-                }
-            }
-
-            setCurrentTaskIndex(startingIndex);
-            setScore(startingScore);
-            if (startingIndex >= tasks.length && tasks.length > 0) {
-                setScreen('result');
-            } else {
-                setScreen('game');
-            }
-        } catch (error) { setScreen('menu'); }
-    };
-    
-    const handleAnswer = (isCorrect: boolean, answerValue: any) => {
-        if (feedback !== 'none' || connectionStatus === 'reconnecting') return;
-
-        const currentTask = currentTasks[currentTaskIndex];
-
-        if (isCorrect) {
-            confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 },
-                colors: ['#10b981', '#3b82f6', '#fcd34d']
-            });
-            setHasErrorOnTask(false);
-            const nextScore = score + 100;
-            const nextIndex = currentTaskIndex + 1;
-            setScore(nextScore);
-            setFeedback('correct');
-            setAiFeedback("");
-
-            if (socket?.readyState === WebSocket.OPEN && sessionContext) {
-                socket.send(JSON.stringify({
-                    type: "UPDATE_PROGRESS",
-                    username: sessionContext.username,
-                    accessCode: sessionContext.accessCode,
-                    sessionId: sessionContext.sessionId,
-                    taskIndex: nextIndex,
-                    score: nextScore
-                }));
-            }
-
-            setTimeout(() => {
-                setFeedback('none');
-                if (currentTaskIndex < currentTasks.length - 1) {
-                    setCurrentTaskIndex(nextIndex);
-                } else {
-                    setScreen('result');
-                }
-            }, 1500);
-        } else {
-            setHasErrorOnTask(true);
-            setFeedback('wrong');
-
-            if (socket?.readyState === WebSocket.OPEN && sessionContext) {
-                let correctAnswerStr = "";
-                let studentAnswerStr = "";
-
-                switch (currentTask.type) {
-                    case 'MultipleChoice':
-                        correctAnswerStr = currentTask.parsedData?.correctAnswer;
-                        studentAnswerStr = answerValue;
-                        break;
-                    case 'SentenceBuilder':
-                        correctAnswerStr = currentTask.parsedData?.correctOrder?.join(" ");
-                        studentAnswerStr = Array.isArray(answerValue) ? answerValue.join(" ") : answerValue;
-                        break;
-                    case 'DragAndDrop':
-                        correctAnswerStr = currentTask.parsedData?.items
-                            ?.map((i: any) => `${i.text} -> ${i.category}`).join(", ");
-                        studentAnswerStr = "Eroare la maparea categoriilor sub acoperire.";
-                        break;
-                    case 'VisualID':
-                        correctAnswerStr = "Ținta corectă din imagine";
-                        studentAnswerStr = "Agentul a scanat o zonă greșită.";
-                        break;
-                }
-
-                socket.send(JSON.stringify({
-                    type: "wrong_answer",
-                    username: sessionContext.username,
-                    accessCode: sessionContext.accessCode,
-                    sessionId: sessionContext.sessionId,
-                    task: currentTask.requirement,
-                    taskIndex: currentTaskIndex,
-                    details: {
-                        question: currentTask.requirement,
-                        correctAnswer: correctAnswerStr,
-                        studentAnswer: studentAnswerStr,
-                        context: currentTask.aiHintContext || "Focalizare pe protocoale lingvistice."
-                    }
-                }));
-            }
-            setTimeout(() => setFeedback('none'), 2000);
-        }
-    };
-
-    const sendHelpRequest = () => {
-        if (connectionStatus === 'reconnecting') {
-            alert("Așteptați restabilirea legăturii securizate!");
-            return;
-        }
-
-        if (socket?.readyState === WebSocket.OPEN && sessionContext) {
-            socket.send(JSON.stringify({
-                type: "HELP_REQUEST",
-                username: sessionContext.username,
-                sessionId: sessionContext.sessionId,
-                accessCode: sessionContext.accessCode
-            }));
-            alert("Solicitare de Backup trimisă către HQ!");
-        }
-    };
-
-
+    const {
+        screen,
+        currentTasks,
+        currentTaskIndex,
+        score,
+        feedback,
+        connectionStatus,
+        hasErrorOnTask,
+        activePin,
+        setActivePin,
+        aiFeedback,
+        feedbackSource,
+        handleAnswer,
+        sendHelpRequest
+    } = useFrenchAdventure(sessionContext);
 
     if (screen === 'loading') return (
         <div style={styles.container}>

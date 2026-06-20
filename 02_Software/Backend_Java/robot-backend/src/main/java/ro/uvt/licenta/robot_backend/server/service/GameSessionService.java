@@ -1,6 +1,7 @@
 package ro.uvt.licenta.robot_backend.server.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ro.uvt.licenta.robot_backend.model.game.*;
@@ -8,12 +9,12 @@ import ro.uvt.licenta.robot_backend.repository.GameLevelRepository;
 import ro.uvt.licenta.robot_backend.repository.GameSessionRepository;
 import ro.uvt.licenta.robot_backend.repository.StudentProgressRepository;
 
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameSessionService {
@@ -22,12 +23,10 @@ public class GameSessionService {
     private final StudentProgressRepository studentProgressRepository;
     private final GameLevelRepository gameLevelRepository;
 
-
     @Transactional
     public GameSession createSession(Long levelId, String teacherUsername) {
-
-        GameLevel level = gameLevelRepository.findById(levelId).orElseThrow(()
-                -> new RuntimeException("Nivel inexistent!"));
+        GameLevel level = gameLevelRepository.findById(levelId)
+                .orElseThrow(() -> new RuntimeException("Nivel inexistent!"));
 
         GameSession session = GameSession.builder()
                 .accessCode(generateCode())
@@ -37,14 +36,13 @@ public class GameSessionService {
                 .teacherUsername(teacherUsername)
                 .build();
 
-        return gameSessionRepository
-                .save(session);
+        return gameSessionRepository.save(session);
     }
 
     @Transactional
     public StudentProgress joinSession(String accessCode, String studentUsername) {
         GameSession session = gameSessionRepository.findByAccessCodeAndActiveTrue(accessCode)
-                .orElseThrow(() -> new RuntimeException("Cod sesiune invalid sau expirat!!!"));
+                .orElseThrow(() -> new RuntimeException("Cod sesiune invalid sau expirat!"));
 
         return studentProgressRepository.findBySessionAndStudentName(session, studentUsername)
                 .orElseGet(() -> studentProgressRepository.save(StudentProgress.builder()
@@ -55,8 +53,6 @@ public class GameSessionService {
                         .score(0)
                         .helpStatus(HelpStatus.NONE)
                         .build()));
-
-
     }
 
     @Transactional
@@ -80,7 +76,6 @@ public class GameSessionService {
         return studentProgressRepository.save(progress);
     }
 
-
     @Transactional
     public StudentProgress requestHelp(Long sessionId, String studentName) {
         GameSession session = gameSessionRepository.findById(sessionId)
@@ -103,7 +98,6 @@ public class GameSessionService {
         csv.append("Nume Elev,Scor Final,Task-uri Finalizate,Număr Erori,Cereri Ajutor Robot\n");
 
         for (StudentProgress progress : students) {
-
             int score = progress.getScore() != null ? progress.getScore() : 0;
             int currentTask = progress.getCurrentTaskIndex() != null ? progress.getCurrentTaskIndex() : 0;
             int errors = progress.getErrorCount() != null ? progress.getErrorCount() : 0;
@@ -111,17 +105,10 @@ public class GameSessionService {
             int aiHelpCount = 0;
             String aiHistory = progress.getAiHintHistory();
             if (aiHistory != null && !aiHistory.isBlank()) {
-                aiHelpCount = aiHistory.length() > 10 ?
-                        aiHistory.split("Beatrix").length - 1 : 1;
+                aiHelpCount = aiHistory.length() > 10 ? aiHistory.split("Beatrix").length - 1 : 1;
             }
 
-            csv.append(String.format("%s,%d,%d,%d,%d\n",
-                    progress.getStudentName(),
-                    score,
-                    currentTask,
-                    errors,
-                    aiHelpCount
-            ));
+            csv.append(String.format("%s,%d,%d,%d,%d\n", progress.getStudentName(), score, currentTask, errors, aiHelpCount));
         }
 
         return csv.toString();
@@ -147,26 +134,24 @@ public class GameSessionService {
 
     @Transactional
     public void deleteSessionData(Long sessionId) {
-
         gameSessionRepository.deleteById(sessionId);
-        System.out.println("Datele sesiunii " + sessionId + " au fost șterse definitiv din baza de date.");
+        log.info("Sesiunea {} a fost ștearsă (cleanup).", sessionId);
     }
 
     @Transactional(readOnly = true)
     public StudentProgress getStudentProgress(String accessCode, String studentName) {
         return studentProgressRepository.findBySession_AccessCodeAndStudentName(accessCode, studentName)
-                .orElseThrow(() -> new RuntimeException("Progresul pentru " + studentName + " în sesiunea " + accessCode + " nu a fost găsit!"));
+                .orElseThrow(() -> new RuntimeException("Progres invalid pt " + studentName));
     }
 
     @Transactional
     public void addAiHintToHistory(String accessCode, String studentName, String newHint) {
-
         StudentProgress progress = getStudentProgress(accessCode, studentName);
-
         String currentHistory = progress.getAiHintHistory();
+
         String updatedHistory = (currentHistory == null || currentHistory.isEmpty())
                 ? newHint
-                : STR."\{currentHistory} | \{newHint}";
+                : currentHistory + " | " + newHint;
 
         if (updatedHistory.length() > 950) {
             updatedHistory = updatedHistory.substring(updatedHistory.length() - 950);
@@ -180,7 +165,7 @@ public class GameSessionService {
     public String getSessionAccessCode(Long sessionId){
         return gameSessionRepository.findById(sessionId)
                 .map(GameSession::getAccessCode)
-                .orElseThrow(() -> new RuntimeException(STR."Sesiunea nu a fost găsită pentru ID: \{sessionId}"));
+                .orElseThrow(() -> new RuntimeException("Sesiune negasita pt id: " + sessionId));
     }
 
     private String generateCode() {
@@ -194,5 +179,4 @@ public class GameSessionService {
     public Optional<GameSession> findByAccessCode(String accessCode) {
         return gameSessionRepository.findByAccessCodeAndActiveTrue(accessCode);
     }
-
 }
