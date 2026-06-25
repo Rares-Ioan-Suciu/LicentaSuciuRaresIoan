@@ -28,7 +28,7 @@ export const RobotTab: React.FC = () => {
               type="text"
               value={robotIp}
               onChange={(e) => setRobotIp(e.target.value)}
-              placeholder="Adresă IP (ex: 192.168.1.7)"
+              placeholder="Adresă IP (ex: 192.168.1.139)"
               style={{ padding: '12px 15px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none', width: '220px', fontSize: '14px', backgroundColor: 'white' }}
             />
             <button

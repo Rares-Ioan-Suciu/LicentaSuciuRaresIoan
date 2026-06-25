@@ -24,7 +24,7 @@ export const useRobotFace = () => {
     const [isBlinking, setIsBlinking] = useState(false);
 
     const wsRef = useRef<WebSocket | null>(null);
-    const robotIpRaw = APP_CONFIG.ROBOT_IP.replace('http://', '') || '192.168.1.7';
+    const robotIpRaw = APP_CONFIG.ROBOT_IP.replace('http://', '') || '192.168.1.139';
 
     const requestWakeLock = async () => {
         try {
@@ -166,8 +166,10 @@ export const useRobotFace = () => {
 
     const introduceRobot = async () => {
         setHasIntroduced(true);
-        const introText = "Salutare tuturor! Eu sunt Beatrix, asistentul vostru robotic. Sunt foarte fericită să vă cunosc și abia aștept să începem misiunea de astăzi. Mult succes!";
-        setMessage("Salutare tuturor! Eu sunt Beatrix...");
+        const introText = "Da, haideți să vă arăt!";
+
+        setMessage("Bună ziua, stimată comisie! Eu sunt Beatrix...");
+
         await speak(introText, 'ro-RO', 'happy');
     };
 

@@ -26,7 +26,7 @@ public class GameSocketHandler extends TextWebSocketHandler {
     private final OpenAIService openAIService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${app.robot.ip:192.168.1.7}")
+    @Value("${app.robot.ip:192.168.1.139}")
     private String esp32Ip;
 
     private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
@@ -222,10 +222,15 @@ public class GameSocketHandler extends TextWebSocketHandler {
 
     private void handleTeacherReply(JsonNode json, String accessCode) throws Exception {
         String studentName = json.path("studentName").asText();
-        String messageContent = json.path("details").asText("Profesorul nu a scris nimic.");
+
+        String messageContent = json.path("message").asText();
+        if (messageContent.isEmpty()) {
+            messageContent = json.path("details").asText();
+        }
+
         sendToUser(accessCode, studentName, Map.of(
-                "type", "teacher_reply",
-                "message", messageContent
+                "type", "TEACHER_QUESTION",
+                "question", messageContent
         ));
     }
 

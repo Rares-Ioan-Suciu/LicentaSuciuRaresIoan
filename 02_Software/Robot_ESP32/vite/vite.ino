@@ -3,8 +3,8 @@
 
 #define CAMERA_MODEL
 
-const char* ssid = "Retea_Robot";   
-const char* password = "robot1234"; 
+const char* ssid = "DIGI-37Eb";   
+const char* password = "PTuKxzQke3"; 
 
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1

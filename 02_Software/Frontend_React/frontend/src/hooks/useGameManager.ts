@@ -32,6 +32,7 @@ export const useGameManager = (isTeacher: boolean) => {
     const [socket, setSocket] = useState<WebSocket | null>(null);
     const [studentName, setStudentName] = useState("");
     const [activePin, setActivePin] = useState<string | null>(null);
+    const [teacherMessage, setTeacherMessage] = useState<any | null>(null);
 
     useEffect(() => {
         const savedMagicCode = localStorage.getItem('magic_join_code');
@@ -116,7 +117,10 @@ export const useGameManager = (isTeacher: boolean) => {
 
             ws.onmessage = (e) => {
                 const msg = JSON.parse(e.data);
+                
 
+                console.log("WS RECEIVED:", msg);
+                
                 if (isTeacher) {
                     if (msg.type === "STUDENT_JOINED" || msg.type === "STUDENT_UPDATE" || msg.type === "STUDENT_NEEDS_HELP") {
 
@@ -163,8 +167,16 @@ export const useGameManager = (isTeacher: boolean) => {
                         }));
                     }
                 } else {
+                    console.log("Mesaj primit de la server:", msg);
                     if (msg.type === "BROADCAST_PIN") {
                         setActivePin(msg.text);
+                    }
+                    else if (
+                        msg.type === "TEACHER_REPLY" ||
+                        msg.type === "TEACHER_QUESTION" ||
+                        msg.type === "ai_feedback"
+                    ) {
+                        setTeacherMessage(msg);
                     }
                     else if (msg.type === "SESSION_TERMINATED") {
                         localStorage.clear();
@@ -191,6 +203,8 @@ export const useGameManager = (isTeacher: boolean) => {
         students, setStudents,
         socket,
         studentName, setStudentName,
-        activePin
+        activePin,
+        teacherMessage,
+        setTeacherMessage
     };
 };

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { APP_CONFIG } from '../config';
 
 export const useRobot = () => {
-    const defaultIp = APP_CONFIG.ROBOT_IP ? APP_CONFIG.ROBOT_IP.replace('http://', '') : '192.168.1.7';
+    const defaultIp = APP_CONFIG.ROBOT_IP ? APP_CONFIG.ROBOT_IP.replace('http://', '') : '192.168.1.139';
 
     const [robotIp, setRobotIp] = useState<string>(defaultIp);
     const [isConnected, setIsConnected] = useState<boolean>(false);

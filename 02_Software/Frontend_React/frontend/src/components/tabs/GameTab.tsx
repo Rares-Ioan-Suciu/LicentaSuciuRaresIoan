@@ -18,9 +18,10 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
         studentCode, setStudentCode,
         studentName, setStudentName,
         students, setStudents,
-        socket
+        socket,
+        teacherMessage,
+        setTeacherMessage
     } = useGameManager(isTeacher);
-
 
     const [broadcastText, setBroadcastText] = useState("");
     const [selectedLevelId, setSelectedLevelId] = useState<number>(2);
@@ -29,6 +30,24 @@ const GameTab = ({ isTeacher }: GameTabProps) => {
     useEffect(() => {
         if (s.injectGlobalStyles) s.injectGlobalStyles();
     }, []);
+
+    useEffect(() => {
+        if (teacherMessage && !isTeacher) {
+
+            let text = "";
+
+            if (teacherMessage.type === "TEACHER_QUESTION") {
+                text = teacherMessage.question;
+            } else if (teacherMessage.type === "ai_feedback") {
+                text = teacherMessage.message;
+            } else {
+                text = JSON.stringify(teacherMessage);
+            }
+
+            alert(`Mesaj de la Profesor:\n\n${text}`);
+            setTeacherMessage(null);
+        }
+    }, [teacherMessage, isTeacher, setTeacherMessage]);
 
     const handleCreateSession = async () => {
         try {
